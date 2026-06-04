@@ -2,7 +2,14 @@ import type { MainModule, MjData, MjModel, MjVFS } from "@mujoco/mujoco";
 
 import { loadMujocoAssets, loadAssetManifest } from "./assetLoader";
 import { loadMujocoModule } from "./mujocoLoader";
-import type { ContactEvent, DemoConfig, PlaybackState, SimulationSnapshot, Vec3 } from "./types";
+import type {
+  BallSpawnSettings,
+  ContactEvent,
+  DemoConfig,
+  PlaybackState,
+  SimulationSnapshot,
+  Vec3
+} from "./types";
 import { ZERO_SNAPSHOT } from "./types";
 
 const MODEL_ROOT = "/assets/mujoco";
@@ -22,8 +29,10 @@ type LiveFrame = {
   episode: number;
   step: number;
   time: number;
+  reset: boolean;
   terminated: boolean;
   truncated: boolean;
+  failureReason: string | null;
   policyLoaded: boolean;
   policyMessage: string;
   state: {
@@ -38,6 +47,7 @@ type LiveFrame = {
   };
   racketPosition: Vec3;
   contact: {
+    event: boolean;
     count: number;
     last: ContactEvent | null;
   };
@@ -62,7 +72,14 @@ export class MujocoWorld {
   private liveConnected = false;
   private playback: PlaybackState = "paused";
   private contactCount = 0;
+  private contactEvent = false;
   private lastContact: ContactEvent | null = null;
+  private currentEpisode = -1;
+  private resetSerial = 0;
+  private lastVisualResetKey = "";
+  private failureReason: string | null = null;
+  private terminated = false;
+  private truncated = false;
   private fallbackTime = 0;
   private fallbackBallPosition: Vec3 = [...ZERO_SNAPSHOT.ball.position] as Vec3;
   private fallbackBallVelocity: Vec3 = [0, 0, 0];
@@ -116,6 +133,18 @@ export class MujocoWorld {
   reset(): SimulationSnapshot {
     this.resetLocalState();
     this.sendCommand({ type: "reset" });
+    return this.snapshot();
+  }
+
+  resetBall(settings: BallSpawnSettings): SimulationSnapshot {
+    this.resetLocalState();
+    this.sendCommand({
+      type: "resetBall",
+      xOffset: settings.xOffset,
+      yOffset: settings.yOffset,
+      height: settings.height,
+      velocityZ: settings.velocityZ
+    });
     return this.snapshot();
   }
 
@@ -232,8 +261,22 @@ export class MujocoWorld {
     this.data.time = Number.isFinite(frame.state.time) ? frame.state.time : frame.time;
     this.module.mj_forward(this.model, this.data);
 
+    const eventKey = `${frame.episode}:${frame.step}`;
+    const episodeChanged = this.currentEpisode !== frame.episode;
+    const floorContact = frame.failureReason === "floor_contact" || frame.ball.position[2] <= 0.025;
+    const shouldResetVisuals = frame.reset || episodeChanged || frame.contact.event || floorContact;
+    if (shouldResetVisuals && this.lastVisualResetKey !== eventKey) {
+      this.resetSerial += 1;
+      this.lastVisualResetKey = eventKey;
+    }
+
+    this.currentEpisode = frame.episode;
     this.contactCount = frame.contact.count;
+    this.contactEvent = frame.contact.event;
     this.lastContact = frame.contact.last;
+    this.failureReason = frame.failureReason;
+    this.terminated = frame.terminated;
+    this.truncated = frame.truncated;
     this.racketAnchor = arrayVec3(this.data.site_xpos, this.ids.racketSite * 3);
   }
 
@@ -243,7 +286,12 @@ export class MujocoWorld {
       this.fallbackBallPosition = [...ZERO_SNAPSHOT.ball.position] as Vec3;
       this.fallbackBallVelocity = [0, 0, 0];
       this.contactCount = 0;
+      this.contactEvent = false;
       this.lastContact = null;
+      this.failureReason = null;
+      this.terminated = false;
+      this.truncated = false;
+      this.resetSerial += 1;
       return;
     }
 
@@ -251,7 +299,12 @@ export class MujocoWorld {
     this.module.mj_forward(this.model, this.data);
     this.racketAnchor = arrayVec3(this.data.site_xpos, this.ids.racketSite * 3);
     this.contactCount = 0;
+    this.contactEvent = false;
     this.lastContact = null;
+    this.failureReason = null;
+    this.terminated = false;
+    this.truncated = false;
+    this.resetSerial += 1;
   }
 
   private loadModel(module: MainModule, scene: string, sceneFormat?: "xml" | "mjb"): MjModel {
@@ -327,6 +380,8 @@ export class MujocoWorld {
     }
 
     return {
+      episode: this.currentEpisode < 0 ? 0 : this.currentEpisode,
+      resetSerial: this.resetSerial,
       time: this.data.time,
       ball: {
         position: this.ballPosition(),
@@ -334,8 +389,12 @@ export class MujocoWorld {
       },
       racketPosition: arrayVec3(this.data.site_xpos, this.ids.racketSite * 3),
       contactCount: this.contactCount,
+      contactEvent: this.contactEvent,
       lastContactTime: this.lastContact?.time ?? null,
       lastContact: this.lastContact,
+      failureReason: this.failureReason,
+      terminated: this.terminated,
+      truncated: this.truncated,
       mujocoLoaded: true,
       policyLoaded: this.liveConnected && this.liveReady,
       policyMessage: this.policyMessage
@@ -355,7 +414,11 @@ export class MujocoWorld {
       this.fallbackBallPosition = [...ZERO_SNAPSHOT.ball.position] as Vec3;
       this.fallbackBallVelocity = [0, 0, 0];
       this.contactCount = 0;
+      this.contactEvent = false;
       this.lastContact = null;
+      this.failureReason = "floor_contact";
+      this.terminated = true;
+      this.resetSerial += 1;
     }
 
     return this.fallbackSnapshot();
@@ -363,6 +426,8 @@ export class MujocoWorld {
 
   private fallbackSnapshot(): SimulationSnapshot {
     return {
+      episode: 0,
+      resetSerial: this.resetSerial,
       time: this.fallbackTime,
       ball: {
         position: this.fallbackBallPosition,
@@ -370,8 +435,12 @@ export class MujocoWorld {
       },
       racketPosition: this.racketAnchor,
       contactCount: this.contactCount,
+      contactEvent: this.contactEvent,
       lastContactTime: this.lastContact?.time ?? null,
       lastContact: this.lastContact,
+      failureReason: this.failureReason,
+      terminated: this.terminated,
+      truncated: this.truncated,
       mujocoLoaded: false,
       policyLoaded: false,
       policyMessage: this.policyMessage

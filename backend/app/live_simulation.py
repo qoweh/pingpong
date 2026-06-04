@@ -16,6 +16,7 @@ from .settings import AppSettings
 class LiveCommandState:
     playback: str = "playing"
     reset_requested: bool = False
+    reset_options: dict[str, Any] | None = None
 
 
 class LiveSimulationService:
@@ -77,6 +78,7 @@ class LiveSimulationSession:
         self.last_info: dict[str, Any] = {}
         self.last_reward: float | None = None
         self.last_contact: dict[str, Any] | None = None
+        self.custom_reset_options: dict[str, Any] | None = None
         self.observation, self.last_info = self.env.reset(seed=service.settings.seed)
         self.service.control_dt = self.control_dt
 
@@ -88,13 +90,19 @@ class LiveSimulationSession:
     def control_dt(self) -> float:
         return float(self.sim.control_dt)
 
-    def reset(self) -> dict[str, Any]:
+    def reset(self, options: dict[str, Any] | None = None) -> dict[str, Any]:
+        if options is not None:
+            self.custom_reset_options = dict(options)
+
         self.episode_index += 1
         self.step_index = 0
         self.reset_pending = False
         self.last_reward = None
         self.last_contact = None
-        self.observation, self.last_info = self.env.reset(seed=self.service.settings.seed + self.episode_index)
+        self.observation, self.last_info = self.env.reset(
+            seed=self.service.settings.seed + self.episode_index,
+            options=self.custom_reset_options,
+        )
         return self.frame(reset=True)
 
     def step(self) -> dict[str, Any]:
@@ -111,6 +119,7 @@ class LiveSimulationSession:
             reward=float(reward),
             terminated=bool(terminated),
             truncated=bool(truncated),
+            include_events=True,
         )
         self.reset_pending = bool(terminated or truncated)
         return frame
@@ -123,10 +132,13 @@ class LiveSimulationSession:
         terminated: bool = False,
         truncated: bool = False,
         reset: bool = False,
+        include_events: bool = False,
     ) -> dict[str, Any]:
         info = self.last_info
         contact_position = vector_from_info(info, "contact_mujoco_position")
-        if info.get("contact_event_during_step") and contact_position is not None:
+        contact_event = bool(include_events and info.get("contact_event_during_step", False))
+        contact_observed = bool(include_events and info.get("contact_observed_during_step", False))
+        if contact_event and contact_position is not None:
             self.last_contact = {
                 "position": contact_position,
                 "time": float(self.sim.data.time),
@@ -157,8 +169,8 @@ class LiveSimulationSession:
             },
             "racketPosition": numeric_vec3(self.sim.racket_position),
             "contact": {
-                "event": bool(info.get("contact_event_during_step", False)),
-                "observed": bool(info.get("contact_observed_during_step", False)),
+                "event": contact_event,
+                "observed": contact_observed,
                 "count": int(info.get("contact_count", 0) or 0),
                 "successfulBounceCount": int(info.get("successful_bounce_count", 0) or 0),
                 "position": contact_position,

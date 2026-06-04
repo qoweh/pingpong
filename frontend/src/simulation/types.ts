@@ -14,8 +14,14 @@ export type PlaybackState = "playing" | "paused";
 export interface VisualizationSettings {
   trail: boolean;
   targetBand: boolean;
-  heightLabel: boolean;
   contactMarker: boolean;
+}
+
+export interface BallSpawnSettings {
+  xOffset: number;
+  yOffset: number;
+  height: number;
+  velocityZ: number;
 }
 
 export interface BallState {
@@ -29,12 +35,18 @@ export interface ContactEvent {
 }
 
 export interface SimulationSnapshot {
+  episode: number;
+  resetSerial: number;
   time: number;
   ball: BallState;
   racketPosition: Vec3;
   contactCount: number;
+  contactEvent: boolean;
   lastContactTime: number | null;
   lastContact: ContactEvent | null;
+  failureReason: string | null;
+  terminated: boolean;
+  truncated: boolean;
   mujocoLoaded: boolean;
   policyLoaded: boolean;
   policyMessage: string;
@@ -48,8 +60,14 @@ export interface DemoConfig {
 export const DEFAULT_VISUALIZATION: VisualizationSettings = {
   trail: false,
   targetBand: false,
-  heightLabel: false,
   contactMarker: false
+};
+
+export const DEFAULT_BALL_SPAWN: BallSpawnSettings = {
+  xOffset: 0,
+  yOffset: 0,
+  height: 0.34,
+  velocityZ: 0
 };
 
 export const DEFAULT_DEMO_CONFIG: DemoConfig = {
@@ -58,15 +76,21 @@ export const DEFAULT_DEMO_CONFIG: DemoConfig = {
 };
 
 export const ZERO_SNAPSHOT: SimulationSnapshot = {
+  episode: 0,
+  resetSerial: 0,
   time: 0,
   ball: {
-    position: [0.35, 0, 1.06],
+    position: [0.456, -0.007, 0.832],
     velocity: [0, 0, 0]
   },
-  racketPosition: [0.35, 0, 0.72],
+  racketPosition: [0.472, 0, 0.49],
   contactCount: 0,
+  contactEvent: false,
   lastContactTime: null,
   lastContact: null,
+  failureReason: null,
+  terminated: false,
+  truncated: false,
   mujocoLoaded: false,
   policyLoaded: false,
   policyMessage: "Connecting to Python live backend"

@@ -63,7 +63,9 @@ async def live(websocket: WebSocket) -> None:
         while True:
             if command_state.reset_requested:
                 command_state.reset_requested = False
-                frame = await asyncio.to_thread(session.reset)
+                reset_options = command_state.reset_options
+                command_state.reset_options = None
+                frame = await asyncio.to_thread(session.reset, reset_options)
             elif command_state.playback == "playing":
                 frame = await asyncio.to_thread(session.step)
             else:
@@ -94,8 +96,33 @@ async def receive_commands(websocket: WebSocket, state: LiveCommandState) -> Non
                 playback = message.get("playback")
                 if playback in {"playing", "paused"}:
                     state.playback = playback
+            elif message_type == "resetBall":
+                state.reset_options = parse_ball_reset_options(message)
+                state.reset_requested = True
     except WebSocketDisconnect:
         return
+
+
+def parse_ball_reset_options(message: dict[str, Any]) -> dict[str, Any]:
+    x_offset = clamp_float(message.get("xOffset"), -0.2, 0.2, 0.0)
+    y_offset = clamp_float(message.get("yOffset"), -0.2, 0.2, 0.0)
+    height = clamp_float(message.get("height"), 0.08, 0.9, 0.34)
+    velocity_x = clamp_float(message.get("velocityX"), -1.0, 1.0, 0.0)
+    velocity_y = clamp_float(message.get("velocityY"), -1.0, 1.0, 0.0)
+    velocity_z = clamp_float(message.get("velocityZ"), -1.0, 1.0, 0.0)
+    return {
+        "ball_height": height,
+        "ball_xy_offset": [x_offset, y_offset],
+        "ball_velocity": [velocity_x, velocity_y, velocity_z],
+    }
+
+
+def clamp_float(value: Any, low: float, high: float, fallback: float) -> float:
+    try:
+        parsed = float(value)
+    except (TypeError, ValueError):
+        return fallback
+    return min(max(parsed, low), high)
 
 
 frontend_dist = settings.frontend_dist

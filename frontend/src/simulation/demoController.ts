@@ -1,5 +1,6 @@
 import { MujocoWorld } from "./mujocoWorld";
 import type {
+  BallSpawnSettings,
   CameraMode,
   DemoConfig,
   PlaybackState,
@@ -36,7 +37,6 @@ export class DemoController {
 
   async initialize(): Promise<void> {
     this.onStatus("Loading MuJoCo WASM");
-    this.loop(0);
 
     try {
       await this.world.initialize(this.config);
@@ -46,6 +46,7 @@ export class DemoController {
       this.renderer.loadWorld(this.world);
       this.onStatus("MuJoCo WASM loaded");
       this.emit(true);
+      this.loop(0);
     } catch (error) {
       this.onStatus(error instanceof Error ? error.message : "MuJoCo failed to load");
       this.initialized = false;
@@ -76,6 +77,11 @@ export class DemoController {
 
   reset(): void {
     this.snapshot = this.world.reset();
+    this.emit(true);
+  }
+
+  resetBall(settings: BallSpawnSettings): void {
+    this.snapshot = this.world.resetBall(settings);
     this.emit(true);
   }
 

@@ -8,7 +8,6 @@ interface VisualizationTogglesProps {
 const TOGGLES: Array<{ key: keyof VisualizationSettings; label: string }> = [
   { key: "trail", label: "Trajectory trail" },
   { key: "targetBand", label: "Target height band" },
-  { key: "heightLabel", label: "Current height label" },
   { key: "contactMarker", label: "Contact marker" }
 ];
 

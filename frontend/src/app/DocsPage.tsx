@@ -6,7 +6,8 @@ const DOCS = [
   { title: "MDP Formulation", path: "/docs/mdp-formulation.md", id: "mdp-formulation" },
   { title: "Policy and Training", path: "/docs/policy-and-training.md", id: "policy-and-training" },
   { title: "Web Deployment", path: "/docs/web-deployment.md", id: "web-deployment" },
-  { title: "Results", path: "/docs/results.md", id: "results" }
+  { title: "Results", path: "/docs/results.md", id: "results" },
+  { title: "Problem Report", path: "/docs/problem-resolution-report.md", id: "problem-report" }
 ];
 
 export function DocsPage() {

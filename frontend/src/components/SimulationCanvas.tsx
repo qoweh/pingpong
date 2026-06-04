@@ -2,6 +2,7 @@ import { useEffect, useRef } from "react";
 
 import { DemoController } from "../simulation/demoController";
 import type {
+  BallSpawnSettings,
   CameraMode,
   PlaybackState,
   SimulationSnapshot,
@@ -12,18 +13,22 @@ interface SimulationCanvasProps {
   playback: PlaybackState;
   cameraMode: CameraMode;
   visualization: VisualizationSettings;
+  ballSpawn: BallSpawnSettings;
   onSnapshot: (snapshot: SimulationSnapshot) => void;
   onStatus: (message: string) => void;
   resetSignal: number;
+  ballResetSignal: number;
 }
 
 export function SimulationCanvas({
   playback,
   cameraMode,
   visualization,
+  ballSpawn,
   onSnapshot,
   onStatus,
-  resetSignal
+  resetSignal,
+  ballResetSignal
 }: SimulationCanvasProps) {
   const hostRef = useRef<HTMLDivElement | null>(null);
   const controllerRef = useRef<DemoController | null>(null);
@@ -60,6 +65,12 @@ export function SimulationCanvas({
       controllerRef.current?.reset();
     }
   }, [resetSignal]);
+
+  useEffect(() => {
+    if (ballResetSignal > 0) {
+      controllerRef.current?.resetBall(ballSpawn);
+    }
+  }, [ballResetSignal, ballSpawn]);
 
   return <div ref={hostRef} className="simulation-canvas" />;
 }

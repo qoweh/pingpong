@@ -1,5 +1,6 @@
 import * as THREE from "three";
 import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
+import { Reflector } from "three/examples/jsm/objects/Reflector.js";
 
 import type { CameraMode, DemoConfig, SimulationSnapshot, VisualizationSettings, Vec3 } from "../simulation/types";
 import type { MujocoWorld } from "../simulation/mujocoWorld";
@@ -17,6 +18,7 @@ export class ThreeScene {
   private readonly scene: THREE.Scene;
   private readonly cameras: Record<Exclude<CameraMode, "four">, THREE.PerspectiveCamera | THREE.OrthographicCamera>;
   private readonly controls: OrbitControls;
+  private readonly floorReflector: Reflector;
   private readonly targetBand: THREE.Mesh;
   private readonly trailLine: THREE.Line;
   private readonly trailPoints: THREE.Vector3[] = [];
@@ -25,17 +27,20 @@ export class ThreeScene {
   private width = 1;
   private height = 1;
   private lastContactTime: number | null = null;
+  private lastTrailResetSerial = -1;
+  private lastMarkerResetSerial = -1;
 
   constructor(private readonly host: HTMLElement) {
     this.scene = new THREE.Scene();
     this.scene.background = new THREE.Color(0.15, 0.25, 0.35);
     this.scene.fog = new THREE.Fog(this.scene.background, 15, 25.5);
 
-    this.renderer = new THREE.WebGLRenderer({ antialias: true, alpha: false });
+    this.renderer = new THREE.WebGLRenderer({ antialias: true, alpha: false, powerPreference: "high-performance" });
     this.renderer.setPixelRatio(1);
     this.renderer.setClearColor(0x263f59, 1);
-    this.renderer.shadowMap.enabled = false;
-    this.renderer.outputColorSpace = THREE.LinearSRGBColorSpace;
+    this.renderer.shadowMap.enabled = true;
+    this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+    this.renderer.outputColorSpace = THREE.SRGBColorSpace;
     this.host.appendChild(this.renderer.domElement);
 
     const target = mujocoToThree([0.45, 0, 0.72]);
@@ -59,6 +64,15 @@ export class ThreeScene {
     this.scene.add(new THREE.HemisphereLight(0xffffff, 0x1b3146, 2.25));
     const key = new THREE.DirectionalLight(0xffffff, 1.55);
     key.position.copy(mujocoToThree([0, -3, 3]));
+    key.castShadow = true;
+    key.shadow.mapSize.set(1024, 1024);
+    key.shadow.camera.near = 0.2;
+    key.shadow.camera.far = 6;
+    key.shadow.camera.left = -2.2;
+    key.shadow.camera.right = 2.2;
+    key.shadow.camera.top = 2.2;
+    key.shadow.camera.bottom = -2.2;
+    key.shadow.bias = -0.00035;
     this.scene.add(key.target);
     this.scene.add(key);
 
@@ -69,6 +83,18 @@ export class ThreeScene {
     const headlight = new THREE.DirectionalLight(0xffffff, 0.9);
     headlight.position.copy(mujocoToThree([1.4, -1.2, 2.0]));
     this.scene.add(headlight);
+
+    this.floorReflector = new Reflector(new THREE.PlaneGeometry(100, 100), {
+      clipBias: 0.003,
+      textureWidth: 512,
+      textureHeight: 512,
+      color: 0x28445f
+    });
+    this.floorReflector.rotateX(-Math.PI / 2);
+    this.floorReflector.position.y = -0.002;
+    this.floorReflector.renderOrder = -2;
+    setMaterialSide(this.floorReflector.material, THREE.FrontSide);
+    this.scene.add(this.floorReflector);
 
     this.targetBand = new THREE.Mesh(
       new THREE.BoxGeometry(1.6, 0.3, 1.6),
@@ -105,7 +131,10 @@ export class ThreeScene {
 
   dispose(): void {
     this.modelScene?.dispose();
+    this.clearContactMarkers();
     this.controls.dispose();
+    this.floorReflector.geometry.dispose();
+    disposeMaterial(this.floorReflector.material);
     this.renderer.dispose();
     this.host.removeChild(this.renderer.domElement);
   }
@@ -137,8 +166,8 @@ export class ThreeScene {
     config: DemoConfig
   ): void {
     this.modelScene?.update();
-    this.updateTrail(snapshot.ball.position, visualization.trail);
-    this.updateTargetBand(visualization.targetBand, config);
+    this.updateTrail(snapshot, visualization.trail);
+    this.updateTargetBand(snapshot, visualization.targetBand, config);
     this.updateContactMarkers(snapshot, visualization.contactMarker);
   }
 
@@ -179,15 +208,21 @@ export class ThreeScene {
     this.renderer.setScissorTest(false);
   }
 
-  private updateTrail(ballPosition: Vec3, visible: boolean): void {
+  private updateTrail(snapshot: SimulationSnapshot, visible: boolean): void {
     this.trailLine.visible = visible;
     if (!visible) {
       this.trailPoints.length = 0;
       this.replaceTrailGeometry([]);
+      this.lastTrailResetSerial = snapshot.resetSerial;
       return;
     }
 
-    this.trailPoints.push(mujocoToThree(ballPosition));
+    if (this.lastTrailResetSerial !== snapshot.resetSerial) {
+      this.trailPoints.length = 0;
+      this.lastTrailResetSerial = snapshot.resetSerial;
+    }
+
+    this.trailPoints.push(mujocoToThree(snapshot.ball.position));
     if (this.trailPoints.length > 180) {
       this.trailPoints.shift();
     }
@@ -200,18 +235,30 @@ export class ThreeScene {
     previous.dispose();
   }
 
-  private updateTargetBand(visible: boolean, config: DemoConfig): void {
+  private updateTargetBand(snapshot: SimulationSnapshot, visible: boolean, config: DemoConfig): void {
     this.targetBand.visible = visible;
     if (!visible) {
       return;
     }
 
     const height = Math.max(0.01, config.heightTolerance * 2);
-    this.targetBand.position.copy(mujocoToThree([0.45, 0, config.targetHeight]));
+    this.targetBand.position.copy(
+      mujocoToThree([
+        snapshot.racketPosition[0],
+        snapshot.racketPosition[1],
+        snapshot.racketPosition[2] + config.targetHeight
+      ])
+    );
     this.targetBand.scale.set(1, height / 0.3, 1);
   }
 
   private updateContactMarkers(snapshot: SimulationSnapshot, visible: boolean): void {
+    if (this.lastMarkerResetSerial !== snapshot.resetSerial) {
+      this.clearContactMarkers();
+      this.lastContactTime = null;
+      this.lastMarkerResetSerial = snapshot.resetSerial;
+    }
+
     if (visible && snapshot.lastContact && snapshot.lastContact.time !== this.lastContactTime) {
       const marker = new THREE.Mesh(
         new THREE.SphereGeometry(0.025, 18, 10),
@@ -237,6 +284,15 @@ export class ThreeScene {
       }
     }
   }
+
+  private clearContactMarkers(): void {
+    for (const marker of this.markers) {
+      this.scene.remove(marker.mesh);
+      marker.mesh.geometry.dispose();
+      (marker.mesh.material as THREE.Material).dispose();
+    }
+    this.markers.length = 0;
+  }
 }
 
 function perspectiveCamera(position: THREE.Vector3, target: THREE.Vector3): THREE.PerspectiveCamera {
@@ -252,4 +308,22 @@ function orthographicCamera(position: THREE.Vector3, target: THREE.Vector3): THR
   camera.up.set(0, 0, -1);
   camera.lookAt(target);
   return camera;
+}
+
+function setMaterialSide(material: THREE.Material | THREE.Material[], side: THREE.Side): void {
+  if (Array.isArray(material)) {
+    material.forEach((entry) => {
+      entry.side = side;
+    });
+    return;
+  }
+  material.side = side;
+}
+
+function disposeMaterial(material: THREE.Material | THREE.Material[]): void {
+  if (Array.isArray(material)) {
+    material.forEach((entry) => entry.dispose());
+    return;
+  }
+  material.dispose();
 }

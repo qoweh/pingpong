@@ -77,8 +77,9 @@ export class MujocoModelScene {
       const material = this.createMaterial(model, geomId, geomType, geomName);
       const mesh = new THREE.Mesh(geometry, material);
       mesh.name = geomName;
-      mesh.castShadow = false;
-      mesh.receiveShadow = false;
+      const isPlane = geomType === module.mjtGeom.mjGEOM_PLANE.value || geomName === "floor";
+      mesh.castShadow = !isPlane;
+      mesh.receiveShadow = true;
 
       setThreePosition(model.geom_pos, geomId, mesh.position);
       setThreeQuaternion(model.geom_quat, geomId, mesh.quaternion);
@@ -173,8 +174,11 @@ export class MujocoModelScene {
         color: new THREE.Color(0x7aa6c9),
         map: texture,
         metalness: 0,
-        roughness: 0.52,
-        side: THREE.DoubleSide
+        roughness: 0.42,
+        transparent: true,
+        opacity: 0.88,
+        depthWrite: false,
+        side: THREE.FrontSide
       });
       this.materials.push(material);
       return material;
@@ -248,7 +252,7 @@ export class MujocoModelScene {
 
   private createCheckerTexture(): THREE.Texture {
     const size = 512;
-    const cells = 8;
+    const cells = 4;
     const cellSize = size / cells;
     const data = new Uint8Array(size * size * 4);
 
@@ -266,9 +270,10 @@ export class MujocoModelScene {
     }
 
     const texture = new THREE.DataTexture(data, size, size, THREE.RGBAFormat, THREE.UnsignedByteType);
-    texture.repeat.set(28, 28);
+    texture.repeat.set(8, 8);
     texture.wrapS = THREE.RepeatWrapping;
     texture.wrapT = THREE.RepeatWrapping;
+    texture.colorSpace = THREE.SRGBColorSpace;
     texture.needsUpdate = true;
     this.textures.push(texture);
     return texture;
