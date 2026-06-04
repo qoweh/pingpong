@@ -6,6 +6,7 @@ import type { MujocoWorld } from "../simulation/mujocoWorld";
 import { MujocoModelScene, mujocoToThree } from "./mujocoModelScene";
 
 const CONTACT_MARKER_TTL = 0.45;
+const TRAIL_MAX_POINTS = 180;
 
 type ContactMarker = {
   mesh: THREE.Mesh;
@@ -19,11 +20,12 @@ export class ThreeScene {
   private readonly controls: OrbitControls;
   private readonly targetBand: THREE.Mesh;
   private readonly trailLine: THREE.Line;
-  private readonly trailPoints: THREE.Vector3[] = [];
+  private readonly trailPositions = new Float32Array(TRAIL_MAX_POINTS * 3);
   private readonly markers: ContactMarker[] = [];
   private modelScene: MujocoModelScene | null = null;
   private width = 1;
   private height = 1;
+  private trailPointCount = 0;
   private lastContactTime: number | null = null;
   private lastTrailResetSerial = -1;
   private lastMarkerResetSerial = -1;
@@ -43,7 +45,7 @@ export class ThreeScene {
 
     const target = mujocoToThree([0.45, 0, 0.72]);
     this.cameras = {
-      free: perspectiveCamera(mujocoToThree([1.8, -1.7, 1.25]), target),
+      free: perspectiveCamera(mujocoToThree([1.35, 1.45, 1.08]), target, 42),
       north: perspectiveCamera(mujocoToThree([0.45, -2.25, 1.0]), target),
       south: perspectiveCamera(mujocoToThree([0.45, 2.25, 1.0]), target),
       east: perspectiveCamera(mujocoToThree([2.2, 0, 1.0]), target),
@@ -95,7 +97,7 @@ export class ThreeScene {
     this.scene.add(this.targetBand);
 
     this.trailLine = new THREE.Line(
-      new THREE.BufferGeometry(),
+      createTrailGeometry(this.trailPositions),
       new THREE.LineBasicMaterial({ color: 0x7dd3fc, transparent: true, opacity: 0.86 })
     );
     this.trailLine.visible = false;
@@ -118,6 +120,10 @@ export class ThreeScene {
   dispose(): void {
     this.modelScene?.dispose();
     this.clearContactMarkers();
+    this.targetBand.geometry.dispose();
+    (this.targetBand.material as THREE.Material).dispose();
+    this.trailLine.geometry.dispose();
+    (this.trailLine.material as THREE.Material).dispose();
     this.controls.dispose();
     this.renderer.dispose();
     this.host.removeChild(this.renderer.domElement);
@@ -195,28 +201,40 @@ export class ThreeScene {
   private updateTrail(snapshot: SimulationSnapshot, visible: boolean): void {
     this.trailLine.visible = visible;
     if (!visible) {
-      this.trailPoints.length = 0;
-      this.replaceTrailGeometry([]);
-      this.lastTrailResetSerial = snapshot.resetSerial;
+      if (this.trailPointCount > 0 || this.lastTrailResetSerial !== snapshot.resetSerial) {
+        this.resetTrailGeometry(snapshot.resetSerial);
+      }
       return;
     }
 
     if (this.lastTrailResetSerial !== snapshot.resetSerial) {
-      this.trailPoints.length = 0;
-      this.lastTrailResetSerial = snapshot.resetSerial;
+      this.resetTrailGeometry(snapshot.resetSerial);
     }
 
-    this.trailPoints.push(mujocoToThree(snapshot.ball.position));
-    if (this.trailPoints.length > 180) {
-      this.trailPoints.shift();
+    if (this.trailPointCount >= TRAIL_MAX_POINTS) {
+      this.trailPositions.copyWithin(0, 3);
+      this.trailPointCount = TRAIL_MAX_POINTS - 1;
     }
-    this.replaceTrailGeometry(this.trailPoints);
+
+    const point = mujocoToThree(snapshot.ball.position);
+    const offset = this.trailPointCount * 3;
+    this.trailPositions[offset] = point.x;
+    this.trailPositions[offset + 1] = point.y;
+    this.trailPositions[offset + 2] = point.z;
+    this.trailPointCount += 1;
+    this.updateTrailGeometry();
   }
 
-  private replaceTrailGeometry(points: THREE.Vector3[]): void {
-    const previous = this.trailLine.geometry;
-    this.trailLine.geometry = new THREE.BufferGeometry().setFromPoints(points);
-    previous.dispose();
+  private resetTrailGeometry(resetSerial: number): void {
+    this.trailPointCount = 0;
+    this.lastTrailResetSerial = resetSerial;
+    this.updateTrailGeometry();
+  }
+
+  private updateTrailGeometry(): void {
+    const position = this.trailLine.geometry.getAttribute("position") as THREE.BufferAttribute;
+    position.needsUpdate = true;
+    this.trailLine.geometry.setDrawRange(0, this.trailPointCount);
   }
 
   private updateTargetBand(snapshot: SimulationSnapshot, visible: boolean, config: DemoConfig): void {
@@ -279,8 +297,17 @@ export class ThreeScene {
   }
 }
 
-function perspectiveCamera(position: THREE.Vector3, target: THREE.Vector3): THREE.PerspectiveCamera {
-  const camera = new THREE.PerspectiveCamera(45, 1, 0.001, 100);
+function createTrailGeometry(positions: Float32Array): THREE.BufferGeometry {
+  const geometry = new THREE.BufferGeometry();
+  const attribute = new THREE.BufferAttribute(positions, 3);
+  attribute.setUsage(THREE.DynamicDrawUsage);
+  geometry.setAttribute("position", attribute);
+  geometry.setDrawRange(0, 0);
+  return geometry;
+}
+
+function perspectiveCamera(position: THREE.Vector3, target: THREE.Vector3, fov = 45): THREE.PerspectiveCamera {
+  const camera = new THREE.PerspectiveCamera(fov, 1, 0.001, 100);
   camera.position.copy(position);
   camera.lookAt(target);
   return camera;
