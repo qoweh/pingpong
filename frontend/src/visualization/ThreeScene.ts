@@ -49,7 +49,7 @@ export class ThreeScene {
 
     const target = mujocoToThree([0.45, 0, 0.72]);
     this.cameras = {
-      free: perspectiveCamera(mujocoToThree([1.5, 1.35, 1.0]), target, 42),
+      free: perspectiveCamera(mujocoToThree([0.386, 1.718, 0.964]), target, 42),
       north: perspectiveCamera(mujocoToThree([0.45, -2.25, 1.0]), target),
       south: perspectiveCamera(mujocoToThree([0.45, 2.25, 1.0]), target),
       east: perspectiveCamera(mujocoToThree([2.2, 0, 1.0]), target),
