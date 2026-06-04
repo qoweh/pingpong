@@ -1,4 +1,4 @@
-import { Github } from "lucide-react";
+import { ExternalLink } from "lucide-react";
 import { useCallback, useState } from "react";
 
 import { BallControls } from "../controls/BallControls";
@@ -42,7 +42,7 @@ export function App() {
           <a href="#demo">Demo</a>
           <a href="#docs">Docs</a>
           <a href={GITHUB_URL} target="_blank" rel="noreferrer">
-            <Github size={17} />
+            <ExternalLink size={17} />
             <span>GitHub</span>
           </a>
         </nav>

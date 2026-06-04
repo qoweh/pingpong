@@ -10,3 +10,4 @@ frontend/dist/
 frontend/.vite/
 backend/build/
 backend/.gradle/
+backend/src/main/resources/static/*

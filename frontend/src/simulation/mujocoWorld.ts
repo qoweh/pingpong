@@ -61,7 +61,9 @@ export class MujocoWorld {
     this.model = module.MjModel.from_xml_path(manifest.scene, this.vfs);
     this.data = new module.MjData(this.model);
     this.ids = this.resolveIds(module, this.model);
-    this.homeCtrl = Array.from(this.model.key_ctrl ?? []).slice(0, this.model.nu);
+    this.homeCtrl = Array.from(this.model.key_ctrl ?? [])
+      .slice(0, this.model.nu)
+      .map((value) => Number(value));
     this.policy = createPolicyRunner(policyManifest);
     this.policyMessage = this.policy.message;
     this.reset(config.ballPosition);
