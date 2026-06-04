@@ -1,13 +1,13 @@
 import { useEffect, useState } from "react";
 
+import { MarkdownDocument } from "./MarkdownDocument";
+
 const DOCS = [
-  { title: "Overview", path: "/docs/overview.md", id: "overview" },
-  { title: "Simulation Environment", path: "/docs/simulation-environment.md", id: "simulation-environment" },
-  { title: "MDP Formulation", path: "/docs/mdp-formulation.md", id: "mdp-formulation" },
-  { title: "Policy and Training", path: "/docs/policy-and-training.md", id: "policy-and-training" },
-  { title: "Web Deployment", path: "/docs/web-deployment.md", id: "web-deployment" },
-  { title: "Results", path: "/docs/results.md", id: "results" },
-  { title: "Problem Report", path: "/docs/problem-resolution-report.md", id: "problem-report" }
+  { title: "개요", path: "/docs/overview.md", id: "overview" },
+  { title: "시뮬레이션 환경", path: "/docs/simulation-environment.md", id: "simulation-environment" },
+  { title: "상태와 행동", path: "/docs/mdp-formulation.md", id: "mdp-formulation" },
+  { title: "제어 모델과 학습", path: "/docs/policy-and-training.md", id: "policy-and-training" },
+  { title: "보상 설계", path: "/docs/reward-function.md", id: "reward-function" }
 ];
 
 export function DocsPage() {
@@ -20,7 +20,7 @@ export function DocsPage() {
       const entries = await Promise.all(
         DOCS.map(async (doc) => {
           const response = await fetch(doc.path);
-          const text = response.ok ? await response.text() : `Failed to load ${doc.path}`;
+          const text = response.ok ? await response.text() : "문서를 불러오지 못했습니다.";
           return [doc.path, text] as const;
         })
       );
@@ -40,7 +40,7 @@ export function DocsPage() {
   return (
     <main className="docs-page">
       <section className="docs-page-header">
-        <h1>Docs</h1>
+        <h1>Documentation</h1>
       </section>
 
       <nav className="docs-grid docs-page-grid" aria-label="Documentation sections">
@@ -54,8 +54,7 @@ export function DocsPage() {
       <div className="docs-stack">
         {DOCS.map((doc) => (
           <article className="doc-section" id={doc.id} key={doc.path}>
-            <h2>{doc.title}</h2>
-            <pre>{contentByPath[doc.path] ?? "Loading..."}</pre>
+            <MarkdownDocument content={contentByPath[doc.path] ?? "문서를 불러오는 중입니다."} />
           </article>
         ))}
       </div>

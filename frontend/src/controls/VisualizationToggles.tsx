@@ -6,8 +6,8 @@ interface VisualizationTogglesProps {
 }
 
 const TOGGLES: Array<{ key: keyof VisualizationSettings; label: string }> = [
-  { key: "trail", label: "Trajectory trail" },
-  { key: "targetBand", label: "Target height band" },
+  { key: "trail", label: "Ball trail" },
+  { key: "targetBand", label: "Target height" },
   { key: "contactMarker", label: "Contact marker" }
 ];
 

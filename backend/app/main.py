@@ -38,7 +38,7 @@ app.add_middleware(
 async def health() -> dict[str, Any]:
     return {
         "status": "ok",
-        "service": "pingpong-python-live",
+        "service": "pingpong-simulation",
         "model": str(settings.model_path),
         "scene": str(settings.scene_path),
     }
@@ -156,7 +156,7 @@ def spa_index_or_status(path: str = ""):
         return JSONResponse(
             {
                 "status": "ok",
-                "message": "Frontend dist is not built. Run npm run build in frontend or use Vite dev server.",
+                "message": "Web app is not built yet. Build the frontend before serving this page.",
             }
         )
 
@@ -168,4 +168,4 @@ def spa_index_or_status(path: str = ""):
     if index.exists():
         return FileResponse(index)
 
-    return JSONResponse({"status": "error", "message": "index.html is missing"}, status_code=404)
+    return JSONResponse({"status": "error", "message": "Web app entry file is missing."}, status_code=404)

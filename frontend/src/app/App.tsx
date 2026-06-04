@@ -27,7 +27,7 @@ export function App() {
   const [visualization, setVisualization] = useState<VisualizationSettings>(DEFAULT_VISUALIZATION);
   const [ballSpawn, setBallSpawn] = useState<BallSpawnSettings>(DEFAULT_BALL_SPAWN);
   const [snapshot, setSnapshot] = useState<SimulationSnapshot>(ZERO_SNAPSHOT);
-  const [status, setStatus] = useState("Loading");
+  const [status, setStatus] = useState("Preparing simulation");
   const [resetSignal, setResetSignal] = useState(0);
   const [ballSpawnSignal, setBallSpawnSignal] = useState(0);
   const [controlsOpen, setControlsOpen] = useState(true);
@@ -53,7 +53,7 @@ export function App() {
       <header className="app-header">
         <a className="brand" href="/" aria-label="Home">
           <span className="brand-mark" />
-          <span>Ping-Pong Keep-Up RL</span>
+          <span>Ping-Pong Keep-Up</span>
         </a>
         <nav className="nav-links" aria-label="Primary navigation">
           {isDocsPage ? null : <a href="/docs">Docs</a>}
@@ -70,7 +70,7 @@ export function App() {
         <main>
           <section className="demo-band" id="demo">
             <div className="demo-layout">
-              <section className="viewer-pane" aria-label="MuJoCo simulation viewer">
+              <section className="viewer-pane" aria-label="Simulation viewer">
                 <Suspense fallback={<div className="simulation-canvas" />}>
                   <SimulationCanvas
                     playback={playback}
@@ -84,12 +84,12 @@ export function App() {
                   />
                 </Suspense>
                 <div className="viewer-title">
-                  <h1>Ping-Pong Keep-Up with Reinforcement Learning</h1>
-                  <p>Live Python PPO control streamed into a MuJoCo WebAssembly viewer.</p>
+                  <h1>Ping-Pong Keep-Up</h1>
+                  <p>A trained controller keeps the ball in play inside a physics simulation.</p>
                 </div>
                 <div className="runtime-status">
                   <span className={ready ? "status-dot ready" : "status-dot"} />
-                  <span>{ready ? "Live MuJoCo" : snapshot.mujocoLoaded ? snapshot.policyMessage : status}</span>
+                  <span>{ready ? "Simulation Ready" : snapshot.mujocoLoaded ? snapshot.policyMessage : status}</span>
                 </div>
                 {!ready ? <LoadingOverlay status={status} snapshot={snapshot} /> : null}
               </section>
@@ -106,7 +106,7 @@ export function App() {
                 </button>
 
                 {controlsOpen ? (
-                  <aside className="control-pane" aria-label="Demo controls">
+                  <aside className="control-pane" aria-label="Simulation controls">
                     <PlaybackControls playback={playback} onPlaybackChange={setPlayback} onReset={reset} />
 
                     <div className="metrics-grid">
@@ -123,8 +123,8 @@ export function App() {
                         <strong>{timeText}</strong>
                       </div>
                       <div>
-                        <span>Live RL</span>
-                        <strong>{snapshot.policyLoaded ? "Loaded" : "Pending"}</strong>
+                        <span>Controller</span>
+                        <strong>{snapshot.policyLoaded ? "Ready" : "Starting"}</strong>
                       </div>
                     </div>
 
@@ -148,17 +148,17 @@ function LoadingOverlay({ status, snapshot }: { status: string; snapshot: Simula
   return (
     <div className="loading-overlay" role="status" aria-live="polite">
       <div className="loading-panel">
-        <span className="loading-kicker">Starting live simulation</span>
-        <h2>Loading MuJoCo and Python PPO</h2>
+        <span className="loading-kicker">Starting simulation</span>
+        <h2>Preparing the scene</h2>
         <div className="loading-bar">
           <span />
         </div>
         <div className="loading-steps">
           <span className={snapshot.mujocoLoaded ? "done" : ""}>
-            {snapshot.mujocoLoaded ? "MuJoCo WASM ready" : status}
+            {snapshot.mujocoLoaded ? "3D scene ready" : status}
           </span>
           <span className={snapshot.policyLoaded ? "done" : ""}>{snapshot.policyMessage}</span>
-          <span>First uncached load can take several seconds on a home server.</span>
+          <span>First uncached load can take several seconds on a server.</span>
         </div>
       </div>
     </div>

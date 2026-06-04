@@ -97,5 +97,5 @@ export const ZERO_SNAPSHOT: SimulationSnapshot = {
   truncated: false,
   mujocoLoaded: false,
   policyLoaded: false,
-  policyMessage: "Connecting to Python live backend"
+  policyMessage: "Connecting to control model"
 };

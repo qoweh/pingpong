@@ -84,7 +84,7 @@ export class MujocoWorld {
   private fallbackBallPosition: Vec3 = [...ZERO_SNAPSHOT.ball.position] as Vec3;
   private fallbackBallVelocity: Vec3 = [0, 0, 0];
   private racketAnchor: Vec3 = [...ZERO_SNAPSHOT.racketPosition] as Vec3;
-  private policyMessage = "Connecting to Python live backend";
+  private policyMessage = "Connecting to control model";
 
   async initialize(): Promise<void> {
     const [module, manifest] = await Promise.all([loadMujocoModule(), loadAssetManifest()]);
@@ -202,7 +202,7 @@ export class MujocoWorld {
 
     this.socket.addEventListener("open", () => {
       this.liveConnected = true;
-      this.policyMessage = "Python live backend connected";
+      this.policyMessage = "Connecting to control model";
       this.sendCommand({ type: "playback", playback: this.playback });
       this.flushPendingSpawn();
     });
@@ -215,7 +215,7 @@ export class MujocoWorld {
 
       if (message.type === "ready") {
         this.liveReady = true;
-        this.policyMessage = "Python live backend ready";
+        this.policyMessage = "Control model ready";
         return;
       }
 
@@ -227,12 +227,12 @@ export class MujocoWorld {
     this.socket.addEventListener("close", () => {
       this.liveConnected = false;
       this.liveReady = false;
-      this.policyMessage = "Python live backend disconnected";
+      this.policyMessage = "Control stream disconnected";
     });
 
     this.socket.addEventListener("error", () => {
       this.liveConnected = false;
-      this.policyMessage = "Python live backend connection failed";
+      this.policyMessage = "Control stream connection failed";
     });
   }
 
@@ -275,7 +275,7 @@ export class MujocoWorld {
       frame.state.qvel.length !== this.model.nv ||
       frame.state.ctrl.length !== this.model.nu
     ) {
-      this.policyMessage = "Python live frame does not match the loaded MuJoCo model.";
+      this.policyMessage = "Control stream does not match the loaded simulation scene.";
       return;
     }
 
@@ -333,7 +333,7 @@ export class MujocoWorld {
 
   private loadModel(module: MainModule, scene: string, sceneFormat?: "xml" | "mjb"): MjModel {
     if (!this.vfs) {
-      throw new Error("MuJoCo virtual file system is not initialized.");
+      throw new Error("Simulation assets are not initialized.");
     }
 
     const format = sceneFormat ?? (scene.endsWith(".mjb") ? "mjb" : "xml");
@@ -372,7 +372,7 @@ export class MujocoWorld {
     const racketSite = module.mj_name2id(model, module.mjtObj.mjOBJ_SITE.value, RACKET_SITE_NAME);
 
     if ([ballBody, ballJoint, racketSite].some((id) => id < 0)) {
-      throw new Error("MuJoCo model is missing ball or racket identifiers.");
+      throw new Error("Simulation scene is missing required ball or paddle markers.");
     }
 
     return {

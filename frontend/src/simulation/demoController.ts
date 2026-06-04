@@ -35,18 +35,18 @@ export class DemoController {
   }
 
   async initialize(): Promise<void> {
-    this.onStatus("Loading MuJoCo WASM");
+    this.onStatus("Preparing 3D scene");
 
     try {
       await this.world.initialize();
       this.snapshot = this.world.reset();
       this.world.setPlayback(this.playback);
       this.renderer.loadWorld(this.world);
-      this.onStatus("MuJoCo WASM loaded");
+      this.onStatus("3D scene ready");
       this.emit(true);
       this.loop(0);
     } catch (error) {
-      this.onStatus(error instanceof Error ? error.message : "MuJoCo failed to load");
+      this.onStatus(error instanceof Error ? error.message : "Simulation failed to load");
       this.snapshot = ZERO_SNAPSHOT;
       this.emit(true);
     }

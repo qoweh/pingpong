@@ -526,18 +526,111 @@ select {
   background: #181818;
 }
 
-.doc-section h2 {
-  margin: 0 0 14px;
-  font-size: 1.1rem;
+.doc-content {
+  color: #dedede;
+  font-size: 0.95rem;
+  line-height: 1.68;
+}
+
+.doc-content h2,
+.doc-content h3,
+.doc-content h4 {
+  margin: 24px 0 10px;
+  color: #f5f5f5;
+  line-height: 1.2;
   letter-spacing: 0;
 }
 
-.doc-section pre {
-  margin: 0;
-  color: #dcdcdc;
-  font: 0.92rem/1.55 ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
-  white-space: pre-wrap;
-  word-break: break-word;
+.doc-content h2:first-child,
+.doc-content h3:first-child,
+.doc-content h4:first-child {
+  margin-top: 0;
+}
+
+.doc-content h2 {
+  font-size: 1.35rem;
+}
+
+.doc-content h3 {
+  font-size: 1.08rem;
+}
+
+.doc-content h4 {
+  font-size: 0.98rem;
+}
+
+.doc-content p {
+  margin: 0 0 13px;
+}
+
+.doc-content ul,
+.doc-content ol {
+  margin: 0 0 16px;
+  padding-left: 1.25rem;
+}
+
+.doc-content li {
+  margin: 5px 0;
+}
+
+.doc-content a {
+  color: #7be5c6;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.doc-content code {
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 5px;
+  background: #222222;
+  color: #f4d19b;
+  font: 0.9em/1.4 ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
+  padding: 0.08rem 0.28rem;
+}
+
+.doc-code {
+  margin: 0 0 16px;
+  overflow: auto;
+  border: 1px solid var(--line);
+  border-radius: 7px;
+  background: #101010;
+  padding: 14px;
+}
+
+.doc-code code {
+  border: 0;
+  background: transparent;
+  color: #eeeeee;
+  padding: 0;
+}
+
+.doc-table-wrap {
+  margin: 0 0 18px;
+  overflow-x: auto;
+}
+
+.doc-content table {
+  width: 100%;
+  border-collapse: collapse;
+  min-width: 560px;
+}
+
+.doc-content th,
+.doc-content td {
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  text-align: left;
+  vertical-align: top;
+}
+
+.doc-content th {
+  background: #222222;
+  color: #f5f5f5;
+  font-weight: 720;
+}
+
+.doc-content td {
+  background: #171717;
 }
 
 @media (max-width: 1060px) {

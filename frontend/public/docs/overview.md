@@ -1,28 +1,41 @@
-# Overview
+# 개요
 
-Ping-Pong Keep-Up with Reinforcement Learning shows a Franka Panda robot arm with a ping-pong paddle keeping a ball in the air in a MuJoCo simulation.
+Ping-Pong Keep-Up은 Franka Panda 로봇팔에 탁구채를 부착하고, 공을 계속 위로 받아 올리는 강화학습 시뮬레이션을 웹에서 보여주는 프로젝트다.
 
-Current runtime architecture:
+웹 화면은 녹화 영상을 재생하는 방식이 아니다. 서버에서 원본 강화학습 환경과 제어 모델을 실행하고, 브라우저는 전달받은 시뮬레이션 상태를 MuJoCo WebAssembly 모델과 Three.js 장면에 반영한다.
 
-```text
-Python live backend
--> original pingpong_rl2 Gym env
--> Stable-Baselines3 PPO policy
--> WebSocket qpos/qvel/ctrl/contact stream
--> browser MuJoCo WASM model for rendering state
--> Three.js viewer
--> Nginx Proxy Manager
-```
+## 목표
 
-The browser no longer runs a hand-ported TypeScript policy and no longer replays a precomputed rollout. The Python backend runs the original RL environment live and the frontend visualizes the latest MuJoCo state.
+- 로컬 MuJoCo viewer에서 보던 환경과 최대한 같은 물리 모델을 웹에서 확인한다.
+- 로봇팔, 라켓, 공, 접촉 횟수, 높이, 카메라, 보조 시각화 기능을 한 화면에서 조작한다.
+- 모델 파일을 바꿔도 코드 여러 곳을 수정하지 않고 `.env` 설정만 바꾸도록 유지한다.
+- Apple Silicon 개발 환경과 `linux/amd64` 서버 배포 환경을 분리해서 관리한다.
 
-Controls:
+## 실행 구조
 
-- Playback
-- Reset
-- Camera mode
-- Visualization toggles
+| 영역 | 역할 |
+| --- | --- |
+| 시뮬레이션 서버 | 원본 `pingpong_rl2` 환경과 선택된 제어 모델을 실행한다. |
+| 웹 뷰어 | MuJoCo WebAssembly 모델을 로드하고 서버에서 받은 상태를 렌더링한다. |
+| 정적 자산 | MJCF, MJB, Franka mesh, 웹 번들 파일을 제공한다. |
+| 배포 프록시 | HTTPS, WebSocket 프록시, 캐시 정책을 담당한다. |
 
-Reference training repository:
+브라우저 쪽 TypeScript가 학습 환경을 다시 구현하지 않는다. 학습 코드의 핵심 동작은 원본 `pingpong_rl2` 패키지를 기준으로 유지하고, 웹은 상태 표시와 사용자 조작에 집중한다.
 
-https://github.com/qoweh/ros2-study/tree/main/graduation-prj/pingpong_rl2
+## 주요 조작
+
+- 재생, 일시정지, 초기화
+- 공 시작 위치와 초기 속도 조절
+- 카메라 전환
+- 공 궤적, 목표 높이, 접촉 위치 표시
+- 오른쪽 조작 패널 접기/펼치기
+
+## 참고 경로
+
+| 항목 | 경로 |
+| --- | --- |
+| 원본 학습 프로젝트 | `/Users/pilt/project-collection/ros2/graduation-prj/pingpong_rl2` |
+| 웹 프로젝트 런타임 자산 | `rl/assets` |
+| 웹 프로젝트 모델 자산 | `rl/artifacts` |
+| vendored 학습 소스 | `backend/vendor/pingpong_rl2` |
+| 기본 모델 설정 | `.env` |

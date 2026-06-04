@@ -15,9 +15,9 @@ const AXES: Array<{
   max: number;
   step: number;
 }> = [
-  { key: "xOffset", label: "X Offset", min: -0.12, max: 0.12, step: 0.005 },
-  { key: "yOffset", label: "Y Offset", min: -0.12, max: 0.12, step: 0.005 },
-  { key: "zOffset", label: "Z Offset", min: 0.15, max: 0.7, step: 0.005 },
+  { key: "xOffset", label: "X Position", min: -0.12, max: 0.12, step: 0.005 },
+  { key: "yOffset", label: "Y Position", min: -0.12, max: 0.12, step: 0.005 },
+  { key: "zOffset", label: "Z Position", min: 0.15, max: 0.7, step: 0.005 },
   { key: "velocityX", label: "X Velocity", min: -0.45, max: 0.45, step: 0.01 },
   { key: "velocityY", label: "Y Velocity", min: -0.45, max: 0.45, step: 0.01 },
   { key: "velocityZ", label: "Z Velocity", min: -0.4, max: 0.4, step: 0.01 }
@@ -26,7 +26,7 @@ const AXES: Array<{
 export function BallControls({ value, onChange }: BallControlsProps) {
   return (
     <div className="control-section">
-      <h2>Ball Spawn</h2>
+      <h2>Ball Start</h2>
       {AXES.map((axis) => (
         <label className="range-row" key={axis.key}>
           <span>{axis.label}</span>
@@ -46,7 +46,7 @@ export function BallControls({ value, onChange }: BallControlsProps) {
       <div className="button-row">
         <button className="action-button muted full" type="button" onClick={() => onChange(DEFAULT_BALL_SPAWN)}>
           <RotateCcw size={16} />
-          <span>Default</span>
+          <span>Reset Ball</span>
         </button>
       </div>
     </div>

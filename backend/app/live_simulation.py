@@ -34,7 +34,7 @@ class LiveSimulationService:
         self.env_kwargs["scene_path"] = str(settings.scene_path)
         self.policy = PPO.load(settings.model_path, device="cpu")
         self.policy_lock = threading.Lock()
-        self.policy_message = f"Live Python PPO: {settings.model_path.name}"
+        self.policy_message = f"Model: {settings.model_path.name}"
         self.control_dt = 0.02
 
     def create_session(self) -> "LiveSimulationSession":

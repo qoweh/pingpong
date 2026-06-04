@@ -12,7 +12,7 @@ const ASSET_FETCH_CONCURRENCY = 8;
 export async function loadAssetManifest(): Promise<MujocoAssetManifest> {
   const response = await fetch("/assets/mujoco/asset-manifest.json");
   if (!response.ok) {
-    throw new Error(`Failed to load MuJoCo asset manifest: ${response.status}`);
+    throw new Error(`Failed to load simulation asset list: ${response.status}`);
   }
 
   return (await response.json()) as MujocoAssetManifest;
@@ -39,7 +39,7 @@ export async function loadMujocoAssets(
 export async function fetchAssetBytes(assetPath: string): Promise<Uint8Array> {
   const response = await fetch(assetPath, { cache: "force-cache" });
   if (!response.ok) {
-    throw new Error(`Failed to load asset ${assetPath}: ${response.status}`);
+    throw new Error(`Failed to load simulation asset ${assetPath}: ${response.status}`);
   }
 
   return new Uint8Array(await response.arrayBuffer());
