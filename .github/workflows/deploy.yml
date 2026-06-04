@@ -12,7 +12,7 @@ jobs:
     steps:
       - name: Deploy
         run: |
-            cd /home/minwoo/pingpong
+            cd /home/pilt/pingpong
 
             git fetch origin
             git reset --hard origin/main
