@@ -18,8 +18,8 @@ const AXES: Array<{
 }> = [
   { key: "xOffset", label: "X Offset", min: -0.12, max: 0.12, step: 0.005 },
   { key: "yOffset", label: "Y Offset", min: -0.12, max: 0.12, step: 0.005 },
-  { key: "height", label: "Height", min: 0.15, max: 0.7, step: 0.005 },
-  { key: "velocityZ", label: "Z Velocity", min: -0.4, max: 0.4, step: 0.01 }
+  { key: "zOffset", label: "Z Offset", min: 0.15, max: 0.7, step: 0.005 },
+  { key: "velocityZ", label: "Initial Z Vel", min: -0.4, max: 0.4, step: 0.01 }
 ];
 
 export function BallControls({ value, onChange, onApply }: BallControlsProps) {
@@ -30,7 +30,7 @@ export function BallControls({ value, onChange, onApply }: BallControlsProps) {
 
   return (
     <div className="control-section">
-      <h2>Ball Reset</h2>
+      <h2>Ball Spawn</h2>
       {AXES.map((axis) => (
         <label className="range-row" key={axis.key}>
           <span>{axis.label}</span>

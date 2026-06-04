@@ -80,8 +80,8 @@ export class DemoController {
     this.emit(true);
   }
 
-  resetBall(settings: BallSpawnSettings): void {
-    this.snapshot = this.world.resetBall(settings);
+  spawnBall(settings: BallSpawnSettings): void {
+    this.snapshot = this.world.spawnBall(settings);
     this.emit(true);
   }
 

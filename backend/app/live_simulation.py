@@ -17,6 +17,8 @@ class LiveCommandState:
     playback: str = "playing"
     reset_requested: bool = False
     reset_options: dict[str, Any] | None = None
+    ball_spawn_requested: bool = False
+    ball_spawn_options: dict[str, Any] | None = None
 
 
 class LiveSimulationService:
@@ -105,6 +107,30 @@ class LiveSimulationSession:
         )
         return self.frame(reset=True)
 
+    def spawn_ball(self, options: dict[str, Any]) -> dict[str, Any]:
+        self.custom_reset_options = dict(options)
+        base_env = self.env.base_env
+        z_offset = float(options.get("ball_height", base_env.ball_height))
+        ball_xy_offset = np.asarray(options.get("ball_xy_offset", (0.0, 0.0)), dtype=float)
+        ball_velocity = np.asarray(options.get("ball_velocity", (0.0, 0.0, 0.0)), dtype=float)
+
+        self.sim.reset_ball_above_racket(
+            height=z_offset,
+            xy_offset=ball_xy_offset,
+            velocity=ball_velocity,
+        )
+        self.sim.data.time = 0.0
+        self._clear_episode_counters()
+
+        self.episode_index += 1
+        self.step_index = 0
+        self.reset_pending = False
+        self.last_reward = None
+        self.last_contact = None
+        self.observation = base_env.observation().astype(np.float32, copy=False)
+        self.last_info = self._spawn_info(ball_xy_offset)
+        return self.frame(reset=True)
+
     def step(self) -> dict[str, Any]:
         if self.reset_pending:
             return self.reset()
@@ -123,6 +149,52 @@ class LiveSimulationSession:
         )
         self.reset_pending = bool(terminated or truncated)
         return frame
+
+    def _clear_episode_counters(self) -> None:
+        base_env = self.env.base_env
+        base_env.step_count = 0
+        base_env.contact_count = 0
+        base_env.successful_bounce_count = 0
+        base_env.stable_cycle_count = 0
+        base_env._consecutive_stable_cycle_count = 0
+        base_env._consecutive_low_apex_contact_count = 0
+        base_env._last_projected_contact_apex_height = None
+        base_env._last_contact_apex_shortfall = 0.0
+        base_env._last_contact_step = None
+        base_env._contact_active_previous_step = False
+        base_env._previous_action[:] = 0.0
+        base_env._contact_frame_velocity_residual_action[:] = 0.0
+        base_env._contact_frame_racket_vz_residual_action = 0.0
+        base_env._contact_frame_tilt_scale_residual_action[:] = 0.0
+        base_env._contact_frame_racket_xy_residual_action[:] = 0.0
+        base_env._contact_frame_target_apex_z_residual_action = 0.0
+        base_env._contact_frame_strike_plane_z_residual_action = 0.0
+        base_env._contact_frame_tracking_xy_residual_action[:] = 0.0
+        base_env._reset_contact_frame_plan()
+        base_env._spawn_ball_height_above_racket = float(self.sim.ball_position[2] - self.sim.racket_position[2])
+
+    def _spawn_info(self, ball_xy_offset: np.ndarray) -> dict[str, Any]:
+        base_env = self.env.base_env
+        return {
+            "failure_reason": None,
+            "success_reason": None,
+            "contact_count": 0,
+            "successful_bounce_count": 0,
+            "stable_cycle_count": 0,
+            "consecutive_stable_cycle_count": 0,
+            "last_projected_contact_apex_height_above_racket": None,
+            "last_contact_apex_shortfall": 0.0,
+            "step_count": 0,
+            "target_position": base_env.controller.target_position,
+            "target_tilt": base_env.controller.target_tilt,
+            "target_velocity": base_env.controller.target_velocity,
+            "ball_height_above_racket": float(self.sim.ball_position[2] - self.sim.racket_position[2]),
+            "spawn_ball_height_above_racket": base_env._spawn_ball_height_above_racket,
+            "spawn_ball_position": self.sim.ball_position.copy(),
+            "spawn_ball_velocity": self.sim.ball_velocity.copy(),
+            "spawn_ball_angular_velocity": self.sim.ball_angular_velocity.copy(),
+            "spawn_ball_xy_offset": ball_xy_offset.copy(),
+        }
 
     def frame(
         self,

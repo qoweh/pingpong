@@ -136,13 +136,19 @@ export class MujocoWorld {
     return this.snapshot();
   }
 
-  resetBall(settings: BallSpawnSettings): SimulationSnapshot {
-    this.resetLocalState();
+  spawnBall(settings: BallSpawnSettings): SimulationSnapshot {
+    this.contactCount = 0;
+    this.contactEvent = false;
+    this.lastContact = null;
+    this.failureReason = null;
+    this.terminated = false;
+    this.truncated = false;
+    this.resetSerial += 1;
     this.sendCommand({
-      type: "resetBall",
+      type: "spawnBall",
       xOffset: settings.xOffset,
       yOffset: settings.yOffset,
-      height: settings.height,
+      zOffset: settings.zOffset,
       velocityZ: settings.velocityZ
     });
     return this.snapshot();

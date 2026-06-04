@@ -29,7 +29,7 @@ export function App() {
   const [snapshot, setSnapshot] = useState<SimulationSnapshot>(ZERO_SNAPSHOT);
   const [status, setStatus] = useState("Loading");
   const [resetSignal, setResetSignal] = useState(0);
-  const [ballResetSignal, setBallResetSignal] = useState(0);
+  const [ballSpawnSignal, setBallSpawnSignal] = useState(0);
   const [controlsOpen, setControlsOpen] = useState(true);
   const ready = snapshot.mujocoLoaded && snapshot.policyLoaded;
   const ballHeightAboveRacket = snapshot.ball.position[2] - snapshot.racketPosition[2];
@@ -45,7 +45,7 @@ export function App() {
   const applyBallSpawn = useCallback((value: BallSpawnSettings) => {
     setPlayback("paused");
     setBallSpawn(value);
-    setBallResetSignal((signal) => signal + 1);
+    setBallSpawnSignal((signal) => signal + 1);
   }, []);
 
   return (
@@ -80,7 +80,7 @@ export function App() {
                     onSnapshot={setSnapshot}
                     onStatus={setStatus}
                     resetSignal={resetSignal}
-                    ballResetSignal={ballResetSignal}
+                    ballSpawnSignal={ballSpawnSignal}
                   />
                 </Suspense>
                 <div className="viewer-title">

@@ -66,6 +66,11 @@ async def live(websocket: WebSocket) -> None:
                 reset_options = command_state.reset_options
                 command_state.reset_options = None
                 frame = await asyncio.to_thread(session.reset, reset_options)
+            elif command_state.ball_spawn_requested:
+                command_state.ball_spawn_requested = False
+                spawn_options = command_state.ball_spawn_options or {}
+                command_state.ball_spawn_options = None
+                frame = await asyncio.to_thread(session.spawn_ball, spawn_options)
             elif command_state.playback == "playing":
                 frame = await asyncio.to_thread(session.step)
             else:
@@ -96,22 +101,22 @@ async def receive_commands(websocket: WebSocket, state: LiveCommandState) -> Non
                 playback = message.get("playback")
                 if playback in {"playing", "paused"}:
                     state.playback = playback
-            elif message_type == "resetBall":
-                state.reset_options = parse_ball_reset_options(message)
-                state.reset_requested = True
+            elif message_type in {"spawnBall", "resetBall"}:
+                state.ball_spawn_options = parse_ball_spawn_options(message)
+                state.ball_spawn_requested = True
     except WebSocketDisconnect:
         return
 
 
-def parse_ball_reset_options(message: dict[str, Any]) -> dict[str, Any]:
+def parse_ball_spawn_options(message: dict[str, Any]) -> dict[str, Any]:
     x_offset = clamp_float(message.get("xOffset"), -0.2, 0.2, 0.0)
     y_offset = clamp_float(message.get("yOffset"), -0.2, 0.2, 0.0)
-    height = clamp_float(message.get("height"), 0.08, 0.9, 0.34)
+    z_offset = clamp_float(message.get("zOffset", message.get("height")), 0.08, 0.9, 0.34)
     velocity_x = clamp_float(message.get("velocityX"), -1.0, 1.0, 0.0)
     velocity_y = clamp_float(message.get("velocityY"), -1.0, 1.0, 0.0)
     velocity_z = clamp_float(message.get("velocityZ"), -1.0, 1.0, 0.0)
     return {
-        "ball_height": height,
+        "ball_height": z_offset,
         "ball_xy_offset": [x_offset, y_offset],
         "ball_velocity": [velocity_x, velocity_y, velocity_z],
     }

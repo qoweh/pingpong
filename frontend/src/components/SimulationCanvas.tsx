@@ -17,7 +17,7 @@ interface SimulationCanvasProps {
   onSnapshot: (snapshot: SimulationSnapshot) => void;
   onStatus: (message: string) => void;
   resetSignal: number;
-  ballResetSignal: number;
+  ballSpawnSignal: number;
 }
 
 export function SimulationCanvas({
@@ -28,7 +28,7 @@ export function SimulationCanvas({
   onSnapshot,
   onStatus,
   resetSignal,
-  ballResetSignal
+  ballSpawnSignal
 }: SimulationCanvasProps) {
   const hostRef = useRef<HTMLDivElement | null>(null);
   const controllerRef = useRef<DemoController | null>(null);
@@ -67,10 +67,10 @@ export function SimulationCanvas({
   }, [resetSignal]);
 
   useEffect(() => {
-    if (ballResetSignal > 0) {
-      controllerRef.current?.resetBall(ballSpawn);
+    if (ballSpawnSignal > 0) {
+      controllerRef.current?.spawnBall(ballSpawn);
     }
-  }, [ballResetSignal, ballSpawn]);
+  }, [ballSpawnSignal, ballSpawn]);
 
   return <div ref={hostRef} className="simulation-canvas" />;
 }

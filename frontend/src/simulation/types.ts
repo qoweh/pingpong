@@ -20,7 +20,7 @@ export interface VisualizationSettings {
 export interface BallSpawnSettings {
   xOffset: number;
   yOffset: number;
-  height: number;
+  zOffset: number;
   velocityZ: number;
 }
 
@@ -66,7 +66,7 @@ export const DEFAULT_VISUALIZATION: VisualizationSettings = {
 export const DEFAULT_BALL_SPAWN: BallSpawnSettings = {
   xOffset: 0,
   yOffset: 0,
-  height: 0.34,
+  zOffset: 0.34,
   velocityZ: 0
 };
 
