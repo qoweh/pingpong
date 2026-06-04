@@ -244,7 +244,7 @@ export class ThreeScene {
     this.trailLine.visible = visible;
     if (!visible) {
       this.trailPoints.length = 0;
-      this.trailLine.geometry.setFromPoints([]);
+      this.replaceTrailGeometry([]);
       return;
     }
 
@@ -252,7 +252,13 @@ export class ThreeScene {
     if (this.trailPoints.length > 180) {
       this.trailPoints.shift();
     }
-    this.trailLine.geometry.setFromPoints(this.trailPoints);
+    this.replaceTrailGeometry(this.trailPoints);
+  }
+
+  private replaceTrailGeometry(points: THREE.Vector3[]): void {
+    const previous = this.trailLine.geometry;
+    this.trailLine.geometry = new THREE.BufferGeometry().setFromPoints(points);
+    previous.dispose();
   }
 
   private updateTargetBand(visible: boolean, config: DemoConfig): void {

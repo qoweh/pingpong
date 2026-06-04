@@ -16,4 +16,12 @@ docker compose up -d
 curl http://localhost:8079/api/health
 ```
 
-The same source tree can be built on the M1 MacBook or on the amd64 server because the final runtime is a Java container serving static frontend assets.
+The preferred deployment path is to build on the ASUS server so Docker creates a native `linux/amd64` image.
+
+If the image is built on the M1 MacBook and then moved to the server, build it with an explicit amd64 platform:
+
+```sh
+DOCKER_DEFAULT_PLATFORM=linux/amd64 docker compose build
+```
+
+For local-only MacBook testing, Docker's default Apple Silicon image is fine because the app serves browser WASM and static assets from a Java container.

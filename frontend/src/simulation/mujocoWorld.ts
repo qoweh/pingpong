@@ -13,7 +13,7 @@ const BALL_GEOM_NAME = "ball_geom";
 const BALL_JOINT_NAME = "ball_joint";
 const RACKET_GEOM_NAME = "racket_head";
 const RACKET_SITE_NAME = "racket_center";
-const CONTROL_DT = 0.02;
+const MAX_PHYSICS_STEPS = 32;
 
 type MujocoIds = {
   ballBody: number;
@@ -79,6 +79,18 @@ export class MujocoWorld {
     this.ids = null;
   }
 
+  getRuntime(): { module: MainModule; model: MjModel; data: MjData } | null {
+    if (!this.module || !this.model || !this.data) {
+      return null;
+    }
+
+    return {
+      module: this.module,
+      model: this.model,
+      data: this.data
+    };
+  }
+
   reset(ballPosition: Vec3): SimulationSnapshot {
     if (!this.module || !this.model || !this.data || !this.ids) {
       this.fallbackTime = 0;
@@ -116,7 +128,9 @@ export class MujocoWorld {
       return this.stepFallback(elapsedSeconds);
     }
 
-    const substeps = Math.max(1, Math.min(12, Math.round(elapsedSeconds / CONTROL_DT)));
+    const timestep = Number(this.model.opt?.timestep ?? 0.002);
+    const substeps = Math.max(1, Math.min(MAX_PHYSICS_STEPS, Math.ceil(elapsedSeconds / timestep)));
+
     for (let index = 0; index < substeps; index += 1) {
       this.applyPolicyAction();
       this.module.mj_step(this.model, this.data);

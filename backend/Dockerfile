@@ -15,6 +15,7 @@ RUN gradle --no-daemon bootJar
 FROM eclipse-temurin:17-jre-jammy
 WORKDIR /app
 ENV SERVER_PORT=8079
+ENV DEBUG=false
 COPY --from=backend-build /workspace/backend/build/libs/pingpong-web.jar /app/app.jar
 EXPOSE 8079
 ENTRYPOINT ["java", "-jar", "/app/app.jar"]

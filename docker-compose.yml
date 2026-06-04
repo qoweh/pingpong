@@ -9,4 +9,5 @@ services:
       - "${PINGPONG_WEB_PORT:-8079}:8079"
     environment:
       SERVER_PORT: 8079
+      DEBUG: "false"
     restart: unless-stopped

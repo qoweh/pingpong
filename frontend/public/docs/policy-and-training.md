@@ -1,9 +1,15 @@
 # Policy and Training
 
-Current bundled model:
+Current source model:
 
 ```text
 pmk_cf_self_rally_v28_robot_base_disk_model.zip
+```
+
+Browser artifact:
+
+```text
+frontend/public/assets/policy/final-policy.json
 ```
 
 Training summary:
@@ -25,4 +31,4 @@ Training summary:
 
 Browser policy status:
 
-The Stable-Baselines3 zip is bundled as the source policy artifact. Browser execution still needs export to ONNX or JSON MLP weights before the PPO policy can run directly in TypeScript.
+The PPO actor weights are exported to JSON MLP format. Browser execution still needs the Python environment's action mapper/controller logic to be ported before those actions can be applied correctly to MuJoCo control values.

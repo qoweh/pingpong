@@ -6,8 +6,8 @@ Current web artifact status:
 | --- | --- |
 | MuJoCo model serving | Added |
 | Three.js viewer | Added |
-| PPO source zip bundled | Added |
-| Browser policy export | Pending |
+| PPO source zip retained | Added |
+| Browser policy JSON export | Added |
 | Live PPO inference in browser | Pending |
 
 Evaluation metrics to add after final policy export:

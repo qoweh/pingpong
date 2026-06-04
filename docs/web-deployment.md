@@ -9,6 +9,12 @@ The project avoids architecture-specific native build output in source control:
 - Docker images used by the Dockerfile are multi-architecture images.
 - The MuJoCo runtime in the browser uses WASM, not host-native MuJoCo binaries.
 
+Architecture note:
+
+- Building directly on the ASUS server produces a native `linux/amd64` image.
+- Building on the M1 MacBook for the ASUS server should use an explicit `linux/amd64` Docker platform.
+- Building on the M1 MacBook for local testing can use Docker's default Apple Silicon platform.
+
 Serving flow:
 
 ```text
