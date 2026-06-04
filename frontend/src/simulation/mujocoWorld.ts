@@ -9,6 +9,7 @@ import { createPolicyRunner, type PolicyRunner } from "../policy/policyRunner";
 import { loadPolicyManifest } from "../policy/policyManifest";
 
 const MODEL_ROOT = "/assets/mujoco";
+const MODEL_FS_ROOT = "/pingpong_model";
 const BALL_BODY_NAME = "ball";
 const BALL_GEOM_NAME = "ball_geom";
 const BALL_JOINT_NAME = "ball_joint";
@@ -145,11 +146,12 @@ export class MujocoWorld {
 
     const modelRoot = manifest.modelRoot || MODEL_ROOT;
 
+    this.ensureVirtualDirectory(MODEL_FS_ROOT);
     await loadMujocoAssets(manifest.files, modelRoot, (file, bytes) => {
-      this.vfs?.addBuffer(file, bytes);
+      this.writeVirtualFile(`${MODEL_FS_ROOT}/${file}`, bytes);
     });
 
-    this.model = this.loadModel(module, manifest.scene, manifest.sceneFormat);
+    this.model = this.loadModel(module, `${MODEL_FS_ROOT}/${manifest.scene}`, manifest.sceneFormat);
     this.data = new module.MjData(this.model);
     this.ids = this.resolveIds(module, this.model);
     this.homeCtrl = Array.from(this.model.key_ctrl ?? [])
@@ -279,6 +281,32 @@ export class MujocoWorld {
 
     const format = sceneFormat ?? (scene.endsWith(".mjb") ? "mjb" : "xml");
     return format === "mjb" ? module.MjModel.from_binary_path(scene, this.vfs) : module.MjModel.from_xml_path(scene, this.vfs);
+  }
+
+  private writeVirtualFile(filePath: string, bytes: Uint8Array): void {
+    if (!this.module) {
+      return;
+    }
+
+    const directory = filePath.slice(0, filePath.lastIndexOf("/"));
+    this.ensureVirtualDirectory(directory);
+    this.module.FS.writeFile(filePath, bytes);
+  }
+
+  private ensureVirtualDirectory(directory: string): void {
+    if (!this.module) {
+      return;
+    }
+
+    let current = "";
+    for (const part of directory.split("/").filter(Boolean)) {
+      current += `/${part}`;
+      try {
+        this.module.FS.mkdir(current);
+      } catch {
+        // Directory already exists in the Emscripten filesystem.
+      }
+    }
   }
 
   getBodyPosition(name: string): Vec3 | null {

@@ -7,7 +7,6 @@ export interface MujocoAssetManifest {
   sourceFiles?: string[];
 }
 
-const ASSET_CACHE_NAME = "pingpong-mujoco-assets-v4";
 const ASSET_FETCH_CONCURRENCY = 8;
 
 export async function loadAssetManifest(): Promise<MujocoAssetManifest> {
@@ -38,43 +37,10 @@ export async function loadMujocoAssets(
 }
 
 export async function fetchAssetBytes(assetPath: string): Promise<Uint8Array> {
-  const cached = await readCachedAsset(assetPath);
-  if (cached) {
-    return cached;
-  }
-
   const response = await fetch(assetPath, { cache: "force-cache" });
   if (!response.ok) {
     throw new Error(`Failed to load asset ${assetPath}: ${response.status}`);
   }
 
-  await writeCachedAsset(assetPath, response.clone());
   return new Uint8Array(await response.arrayBuffer());
-}
-
-async function readCachedAsset(assetPath: string): Promise<Uint8Array | null> {
-  if (!("caches" in window)) {
-    return null;
-  }
-
-  const cache = await caches.open(ASSET_CACHE_NAME);
-  const response = await cache.match(cacheKey(assetPath));
-  if (!response || !response.ok) {
-    return null;
-  }
-
-  return new Uint8Array(await response.arrayBuffer());
-}
-
-async function writeCachedAsset(assetPath: string, response: Response): Promise<void> {
-  if (!("caches" in window) || !response.ok) {
-    return;
-  }
-
-  const cache = await caches.open(ASSET_CACHE_NAME);
-  await cache.put(cacheKey(assetPath), response);
-}
-
-function cacheKey(assetPath: string): string {
-  return new URL(assetPath, window.location.origin).toString();
 }

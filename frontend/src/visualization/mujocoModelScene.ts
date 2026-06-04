@@ -1,6 +1,5 @@
 import * as THREE from "three";
 import type { MainModule, MjData, MjModel } from "@mujoco/mujoco";
-import { mergeVertices } from "three/examples/jsm/utils/BufferGeometryUtils.js";
 
 type MujocoRuntime = {
   module: MainModule;
@@ -341,17 +340,42 @@ function createMeshGeometry(model: MjModel, meshId: number): THREE.BufferGeometr
   geometry.setAttribute("position", new THREE.BufferAttribute(vertices, 3));
   geometry.setIndex(new THREE.BufferAttribute(index, 1));
 
+  const normalAttribute = createNormalAttribute(model, meshId, vertices.length / 3);
+  if (normalAttribute) {
+    geometry.setAttribute("normal", normalAttribute);
+  } else {
+    geometry.computeVertexNormals();
+  }
+
   const uvAttribute = createUvAttribute(model, meshId, vertices.length / 3);
   if (uvAttribute) {
     geometry.setAttribute("uv", uvAttribute);
   }
 
-  const merged = mergeVertices(geometry, 1.0e-5);
-  merged.computeVertexNormals();
+  geometry.computeBoundingSphere();
+  return geometry;
+}
 
-  merged.computeBoundingSphere();
-  geometry.dispose();
-  return merged;
+function createNormalAttribute(model: MjModel, meshId: number, vertexCount: number): THREE.BufferAttribute | null {
+  if (Number(model.mesh_normaladr?.[meshId] ?? -1) < 0 || Number(model.mesh_normalnum?.[meshId] ?? 0) <= 0) {
+    return null;
+  }
+
+  const normalStart = Number(model.mesh_normaladr[meshId]) * 3;
+  const normalEnd = normalStart + Number(model.mesh_normalnum[meshId]) * 3;
+  const sourceNormals = model.mesh_normal.subarray(normalStart, normalEnd);
+  if (sourceNormals.length < vertexCount * 3) {
+    return null;
+  }
+
+  const normals = new Float32Array(vertexCount * 3);
+  for (let index = 0; index < vertexCount * 3; index += 3) {
+    normals[index] = Number(sourceNormals[index]);
+    normals[index + 1] = Number(sourceNormals[index + 2]);
+    normals[index + 2] = -Number(sourceNormals[index + 1]);
+  }
+
+  return new THREE.BufferAttribute(normals, 3);
 }
 
 function createUvAttribute(model: MjModel, meshId: number, vertexCount: number): THREE.BufferAttribute | null {
