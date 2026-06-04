@@ -78,8 +78,8 @@ export class MujocoModelScene {
       const material = this.createMaterial(model, geomId, geomType, geomName);
       const mesh = new THREE.Mesh(geometry, material);
       mesh.name = geomName;
-      mesh.castShadow = geomType !== module.mjtGeom.mjGEOM_PLANE.value;
-      mesh.receiveShadow = true;
+      mesh.castShadow = false;
+      mesh.receiveShadow = false;
 
       setThreePosition(model.geom_pos, geomId, mesh.position);
       setThreeQuaternion(model.geom_quat, geomId, mesh.quaternion);
@@ -249,16 +249,16 @@ export class MujocoModelScene {
 
   private createCheckerTexture(): THREE.Texture {
     const size = 512;
-    const cells = 16;
+    const cells = 8;
     const cellSize = size / cells;
     const data = new Uint8Array(size * size * 4);
 
     for (let y = 0; y < size; y += 1) {
       for (let x = 0; x < size; x += 1) {
-        const edge = x % cellSize < 2 || y % cellSize < 2;
+        const edge = x % cellSize < 3 || y % cellSize < 3;
         const bright = (Math.floor(x / cellSize) + Math.floor(y / cellSize)) % 2 === 0;
         const offset = (y * size + x) * 4;
-        const color = edge ? [205, 226, 238] : bright ? [47, 96, 136] : [27, 66, 98];
+        const color = edge ? [128, 191, 235] : bright ? [38, 91, 136] : [22, 61, 103];
         data[offset] = color[0];
         data[offset + 1] = color[1];
         data[offset + 2] = color[2];
@@ -267,7 +267,7 @@ export class MujocoModelScene {
     }
 
     const texture = new THREE.DataTexture(data, size, size, THREE.RGBAFormat, THREE.UnsignedByteType);
-    texture.repeat.set(50, 50);
+    texture.repeat.set(28, 28);
     texture.wrapS = THREE.RepeatWrapping;
     texture.wrapT = THREE.RepeatWrapping;
     texture.needsUpdate = true;

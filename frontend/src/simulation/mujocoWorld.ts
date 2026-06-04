@@ -196,9 +196,7 @@ export class MujocoWorld {
       this.module.mj_step(this.model, this.data);
       const contactState = this.updateContactState();
       if (contactState.floor) {
-        this.resetContactMetrics();
-        this.spawnBall(this.spawnPosition, [0, 0, 0]);
-        this.module.mj_forward(this.model, this.data);
+        this.reset(this.spawnPosition);
         break;
       }
       this.respawnBallIfOutOfBounds();
@@ -514,9 +512,7 @@ export class MujocoWorld {
       return;
     }
 
-    this.resetContactMetrics();
-    this.spawnBall(this.spawnPosition, [0, 0, 0]);
-    this.module.mj_forward(this.model, this.data);
+    this.reset(this.spawnPosition);
   }
 
   private resetContactMetrics(): void {

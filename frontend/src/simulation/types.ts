@@ -54,9 +54,9 @@ export const DEFAULT_VISUALIZATION: VisualizationSettings = {
 };
 
 export const DEFAULT_DEMO_CONFIG: DemoConfig = {
-  targetHeight: 0.85,
-  heightTolerance: 0.15,
-  ballPosition: [0.21, 0.08, 1.05]
+  targetHeight: 0.3,
+  heightTolerance: 0.1,
+  ballPosition: [0, 0, 0.34]
 };
 
 export const ZERO_SNAPSHOT: SimulationSnapshot = {

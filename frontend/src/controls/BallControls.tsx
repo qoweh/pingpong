@@ -6,9 +6,9 @@ interface BallControlsProps {
 }
 
 const AXES: Array<{ label: string; index: 0 | 1 | 2; min: number; max: number; step: number }> = [
-  { label: "X", index: 0, min: -0.45, max: 0.85, step: 0.01 },
-  { label: "Y", index: 1, min: -0.55, max: 0.55, step: 0.01 },
-  { label: "Z", index: 2, min: 0.7, max: 1.6, step: 0.01 }
+  { label: "X Offset", index: 0, min: -0.12, max: 0.12, step: 0.005 },
+  { label: "Y Offset", index: 1, min: -0.12, max: 0.12, step: 0.005 },
+  { label: "Height", index: 2, min: 0.2, max: 0.55, step: 0.005 }
 ];
 
 export function BallControls({ value, onChange }: BallControlsProps) {

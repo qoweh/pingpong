@@ -34,8 +34,7 @@ export class ThreeScene {
     this.renderer = new THREE.WebGLRenderer({ antialias: true, alpha: false });
     this.renderer.setPixelRatio(1);
     this.renderer.setClearColor(0x263f59, 1);
-    this.renderer.shadowMap.enabled = true;
-    this.renderer.shadowMap.type = THREE.PCFShadowMap;
+    this.renderer.shadowMap.enabled = false;
     this.renderer.outputColorSpace = THREE.LinearSRGBColorSpace;
     this.host.appendChild(this.renderer.domElement);
 
@@ -57,21 +56,17 @@ export class ThreeScene {
     this.controls.zoomSpeed = 1.0;
     this.controls.update();
 
-    this.scene.add(new THREE.HemisphereLight(0xffffff, 0x1b3146, 1.15));
-    const key = new THREE.SpotLight(0xffffff, 12.5, 12, 1.1, 0.45, 1.0);
+    this.scene.add(new THREE.HemisphereLight(0xffffff, 0x1b3146, 2.25));
+    const key = new THREE.DirectionalLight(0xffffff, 1.55);
     key.position.copy(mujocoToThree([0, -3, 3]));
-    key.target.position.copy(target);
-    key.castShadow = true;
-    key.shadow.mapSize.width = 1024;
-    key.shadow.mapSize.height = 1024;
-    key.shadow.camera.near = 0.1;
-    key.shadow.camera.far = 10;
-    key.shadow.bias = -0.00003;
-    key.shadow.normalBias = 0.02;
     this.scene.add(key.target);
     this.scene.add(key);
 
-    const headlight = new THREE.DirectionalLight(0xffffff, 1.4);
+    const fill = new THREE.DirectionalLight(0xffffff, 1.15);
+    fill.position.copy(mujocoToThree([-1.2, 1.4, 2.0]));
+    this.scene.add(fill);
+
+    const headlight = new THREE.DirectionalLight(0xffffff, 0.9);
     headlight.position.copy(mujocoToThree([1.4, -1.2, 2.0]));
     this.scene.add(headlight);
 

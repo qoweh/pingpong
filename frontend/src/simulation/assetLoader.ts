@@ -4,7 +4,7 @@ export interface MujocoAssetManifest {
   files: string[];
 }
 
-const ASSET_CACHE_NAME = "pingpong-mujoco-assets-v1";
+const ASSET_CACHE_NAME = "pingpong-mujoco-assets-v3";
 const ASSET_FETCH_CONCURRENCY = 8;
 
 export async function loadAssetManifest(): Promise<MujocoAssetManifest> {

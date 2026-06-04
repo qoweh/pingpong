@@ -6,6 +6,7 @@ import { CameraControls } from "../controls/CameraControls";
 import { PlaybackControls } from "../controls/PlaybackControls";
 import { VisualizationToggles } from "../controls/VisualizationToggles";
 import { SimulationCanvas } from "../components/SimulationCanvas";
+import { DocsPage } from "./DocsPage";
 import type {
   CameraMode,
   PlaybackState,
@@ -15,10 +16,11 @@ import type {
 } from "../simulation/types";
 import { DEFAULT_DEMO_CONFIG, DEFAULT_VISUALIZATION, ZERO_SNAPSHOT } from "../simulation/types";
 
-const GITHUB_URL = "https://github.com/qoweh/ros2-study/tree/main/graduation-prj/pingpong_rl2";
+const GITHUB_URL = "https://github.com/qoweh/pingpong";
 
 export function App() {
-  const [playback, setPlayback] = useState<PlaybackState>("paused");
+  const isDocsPage = window.location.pathname === "/docs";
+  const [playback, setPlayback] = useState<PlaybackState>("playing");
   const [ballPosition, setBallPosition] = useState<Vec3>(DEFAULT_DEMO_CONFIG.ballPosition);
   const [cameraMode, setCameraMode] = useState<CameraMode>("free");
   const [visualization, setVisualization] = useState<VisualizationSettings>(DEFAULT_VISUALIZATION);
@@ -34,13 +36,12 @@ export function App() {
   return (
     <div className="app-shell">
       <header className="app-header">
-        <a className="brand" href="#demo" aria-label="Demo">
+        <a className="brand" href="/" aria-label="Home">
           <span className="brand-mark" />
           <span>Ping-Pong Keep-Up RL</span>
         </a>
         <nav className="nav-links" aria-label="Primary navigation">
-          <a href="#demo">Demo</a>
-          <a href="#docs">Docs</a>
+          <a href="/docs">Docs</a>
           <a href={GITHUB_URL} target="_blank" rel="noreferrer">
             <ExternalLink size={17} />
             <span>GitHub</span>
@@ -48,6 +49,9 @@ export function App() {
         </nav>
       </header>
 
+      {isDocsPage ? (
+        <DocsPage />
+      ) : (
       <main>
         <section className="demo-band" id="demo">
           <div className="demo-layout">
@@ -110,18 +114,8 @@ export function App() {
             </aside>
           </div>
         </section>
-
-        <section className="docs-band" id="docs">
-          <div className="docs-grid">
-            <a href="/docs/overview.md">Overview</a>
-            <a href="/docs/simulation-environment.md">Simulation Environment</a>
-            <a href="/docs/mdp-formulation.md">MDP Formulation</a>
-            <a href="/docs/policy-and-training.md">Policy and Training</a>
-            <a href="/docs/web-deployment.md">Web Deployment</a>
-            <a href="/docs/results.md">Results</a>
-          </div>
-        </section>
       </main>
+      )}
     </div>
   );
 }

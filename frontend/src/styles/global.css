@@ -284,7 +284,7 @@ button {
 
 .range-row {
   display: grid;
-  grid-template-columns: 20px minmax(0, 1fr) 58px;
+  grid-template-columns: 68px minmax(0, 1fr) 58px;
   align-items: center;
   gap: 10px;
   color: var(--muted);
@@ -366,6 +366,50 @@ select {
   color: white;
 }
 
+.docs-page {
+  width: min(1180px, 100%);
+  margin: 0 auto;
+  padding: 36px 28px 72px;
+}
+
+.docs-page-header h1 {
+  margin: 0 0 18px;
+  font-size: 2rem;
+  line-height: 1.05;
+  letter-spacing: 0;
+}
+
+.docs-page-grid {
+  padding: 0 0 28px;
+}
+
+.docs-stack {
+  display: grid;
+  gap: 24px;
+}
+
+.doc-section {
+  scroll-margin-top: 86px;
+  padding: 22px;
+  border: 1px solid var(--line);
+  border-radius: 7px;
+  background: #181818;
+}
+
+.doc-section h2 {
+  margin: 0 0 14px;
+  font-size: 1.1rem;
+  letter-spacing: 0;
+}
+
+.doc-section pre {
+  margin: 0;
+  color: #dcdcdc;
+  font: 0.92rem/1.55 ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
 @media (max-width: 1060px) {
   .viewer-pane {
     min-height: 58vh;
@@ -412,14 +456,14 @@ select {
     font-size: 0.84rem;
   }
 
-  .nav-links a:nth-child(2) {
-    display: none;
-  }
-
   .demo-band,
   .docs-band {
     padding-left: 14px;
     padding-right: 14px;
+  }
+
+  .docs-page {
+    padding: 26px 14px 48px;
   }
 
   .viewer-title {
