@@ -254,6 +254,7 @@ Runtime fix:
 - Removed browser-side JSON policy inference.
 - Removed the TypeScript `RacketCartesianController` port.
 - Removed BallControls because arbitrary browser-side ball spawning would no longer be the exported Python episode.
+- Pinned browser `@mujoco/mujoco` to `3.8.0`, matching the Python `mujoco_env` runtime.
 - The browser now loads the compiled MJB scene, applies exported `ctrl` frames, and advances MuJoCo WASM with the exported substep count.
 - Contact count and reset-loop behavior come from the Python trace metadata.
 

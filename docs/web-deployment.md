@@ -29,4 +29,5 @@ WASM serving notes:
 
 - `.wasm` is served as `application/wasm`.
 - The MVP uses single-threaded `@mujoco/mujoco`.
+- `@mujoco/mujoco` is pinned to `3.8.0` to match the Python `mujoco_env` runtime used to export rollout traces.
 - Multi-threaded WASM is not enabled, so cross-origin isolation headers are not required for the MVP.
