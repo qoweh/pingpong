@@ -99,8 +99,7 @@ export function App() {
                   />
                 </Suspense>
                 <div className="viewer-title">
-                  <h1>Ping-Pong Keep-Up</h1>
-                  <p>A trained controller keeps the ball in play inside a physics simulation.</p>
+                  <p>A reinforcement learning agent controls a virtual racket to keep a ping-pong ball in play.</p>
                 </div>
                 <div className="runtime-status">
                   <span className={ready ? "status-dot ready" : "status-dot"} />
