@@ -1,6 +1,5 @@
 import * as THREE from "three";
 import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
-import { Reflector } from "three/examples/jsm/objects/Reflector.js";
 
 import type { CameraMode, DemoConfig, SimulationSnapshot, VisualizationSettings, Vec3 } from "../simulation/types";
 import type { MujocoWorld } from "../simulation/mujocoWorld";
@@ -18,7 +17,6 @@ export class ThreeScene {
   private readonly scene: THREE.Scene;
   private readonly cameras: Record<Exclude<CameraMode, "four">, THREE.PerspectiveCamera | THREE.OrthographicCamera>;
   private readonly controls: OrbitControls;
-  private readonly floorReflector: Reflector;
   private readonly targetBand: THREE.Mesh;
   private readonly trailLine: THREE.Line;
   private readonly trailPoints: THREE.Vector3[] = [];
@@ -84,18 +82,6 @@ export class ThreeScene {
     headlight.position.copy(mujocoToThree([1.4, -1.2, 2.0]));
     this.scene.add(headlight);
 
-    this.floorReflector = new Reflector(new THREE.PlaneGeometry(100, 100), {
-      clipBias: 0.003,
-      textureWidth: 512,
-      textureHeight: 512,
-      color: 0x28445f
-    });
-    this.floorReflector.rotateX(-Math.PI / 2);
-    this.floorReflector.position.y = -0.002;
-    this.floorReflector.renderOrder = -2;
-    setMaterialSide(this.floorReflector.material, THREE.FrontSide);
-    this.scene.add(this.floorReflector);
-
     this.targetBand = new THREE.Mesh(
       new THREE.BoxGeometry(1.6, 0.3, 1.6),
       new THREE.MeshBasicMaterial({
@@ -133,8 +119,6 @@ export class ThreeScene {
     this.modelScene?.dispose();
     this.clearContactMarkers();
     this.controls.dispose();
-    this.floorReflector.geometry.dispose();
-    disposeMaterial(this.floorReflector.material);
     this.renderer.dispose();
     this.host.removeChild(this.renderer.domElement);
   }
@@ -308,22 +292,4 @@ function orthographicCamera(position: THREE.Vector3, target: THREE.Vector3): THR
   camera.up.set(0, 0, -1);
   camera.lookAt(target);
   return camera;
-}
-
-function setMaterialSide(material: THREE.Material | THREE.Material[], side: THREE.Side): void {
-  if (Array.isArray(material)) {
-    material.forEach((entry) => {
-      entry.side = side;
-    });
-    return;
-  }
-  material.side = side;
-}
-
-function disposeMaterial(material: THREE.Material | THREE.Material[]): void {
-  if (Array.isArray(material)) {
-    material.forEach((entry) => entry.dispose());
-    return;
-  }
-  material.dispose();
 }

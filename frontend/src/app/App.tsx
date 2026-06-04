@@ -94,46 +94,48 @@ export function App() {
                 {!ready ? <LoadingOverlay status={status} snapshot={snapshot} /> : null}
               </section>
 
-              <button
-                className="panel-toggle"
-                type="button"
-                title={controlsOpen ? "Hide controls" : "Show controls"}
-                aria-label={controlsOpen ? "Hide controls" : "Show controls"}
-                onClick={() => setControlsOpen((open) => !open)}
-              >
-                {controlsOpen ? <PanelRightClose size={18} /> : <PanelRightOpen size={18} />}
-              </button>
+              <div className={controlsOpen ? "control-shell open" : "control-shell closed"}>
+                <button
+                  className="panel-toggle"
+                  type="button"
+                  title={controlsOpen ? "Hide controls" : "Show controls"}
+                  aria-label={controlsOpen ? "Hide controls" : "Show controls"}
+                  onClick={() => setControlsOpen((open) => !open)}
+                >
+                  {controlsOpen ? <PanelRightClose size={18} /> : <PanelRightOpen size={18} />}
+                </button>
 
-              {controlsOpen ? (
-                <aside className="control-pane" aria-label="Demo controls">
-                  <PlaybackControls playback={playback} onPlaybackChange={setPlayback} onReset={reset} />
+                {controlsOpen ? (
+                  <aside className="control-pane" aria-label="Demo controls">
+                    <PlaybackControls playback={playback} onPlaybackChange={setPlayback} onReset={reset} />
 
-                  <div className="metrics-grid">
-                    <div>
-                      <span>Height</span>
-                      <strong>{heightText}</strong>
+                    <div className="metrics-grid">
+                      <div>
+                        <span>Height</span>
+                        <strong>{heightText}</strong>
+                      </div>
+                      <div>
+                        <span>Contacts</span>
+                        <strong>{contactText}</strong>
+                      </div>
+                      <div>
+                        <span>Time</span>
+                        <strong>{timeText}</strong>
+                      </div>
+                      <div>
+                        <span>Live RL</span>
+                        <strong>{snapshot.policyLoaded ? "Loaded" : "Pending"}</strong>
+                      </div>
                     </div>
-                    <div>
-                      <span>Contacts</span>
-                      <strong>{contactText}</strong>
-                    </div>
-                    <div>
-                      <span>Time</span>
-                      <strong>{timeText}</strong>
-                    </div>
-                    <div>
-                      <span>Live RL</span>
-                      <strong>{snapshot.policyLoaded ? "Loaded" : "Pending"}</strong>
-                    </div>
-                  </div>
 
-                  <BallControls value={ballSpawn} onChange={setBallSpawn} onApply={applyBallSpawn} />
-                  <CameraControls value={cameraMode} onChange={setCameraMode} />
-                  <VisualizationToggles value={visualization} onChange={setVisualization} />
+                    <BallControls value={ballSpawn} onChange={setBallSpawn} onApply={applyBallSpawn} />
+                    <CameraControls value={cameraMode} onChange={setCameraMode} />
+                    <VisualizationToggles value={visualization} onChange={setVisualization} />
 
-                  <div className="policy-note">{snapshot.policyMessage}</div>
-                </aside>
-              ) : null}
+                    <div className="policy-note">{snapshot.policyMessage}</div>
+                  </aside>
+                ) : null}
+              </div>
             </div>
           </section>
         </main>
