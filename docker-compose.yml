@@ -1,0 +1,12 @@
+services:
+  pingpong-web:
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
+    image: pingpong-web:local
+    container_name: pingpong-web
+    ports:
+      - "${PINGPONG_WEB_PORT:-8079}:8079"
+    environment:
+      SERVER_PORT: 8079
+    restart: unless-stopped

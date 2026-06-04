@@ -1,1 +1,12 @@
 rl/
+.env
+.DS_Store
+node_modules/
+dist/
+build/
+.gradle/
+frontend/node_modules/
+frontend/dist/
+frontend/.vite/
+backend/build/
+backend/.gradle/
