@@ -12,9 +12,8 @@ jobs:
     steps:
       - name: Deploy
         run: |
-            cd /home/pilt/pingpong
-
-            git fetch origin
-            git reset --hard origin/main
-
-            docker compose up -d --build --force-recreate
+          cd /home/pilt/pingpong
+          git fetch origin
+          git reset --hard origin/main
+          docker compose build --quiet
+          docker compose up -d --force-recreate
