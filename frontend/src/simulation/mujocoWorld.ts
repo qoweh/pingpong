@@ -68,6 +68,7 @@ export class MujocoWorld {
   private ids: MujocoIds | null = null;
   private socket: WebSocket | null = null;
   private latestFrame: LiveFrame | null = null;
+  private pendingSpawn: BallSpawnSettings | null = null;
   private liveReady = false;
   private liveConnected = false;
   private playback: PlaybackState = "paused";
@@ -144,13 +145,8 @@ export class MujocoWorld {
     this.terminated = false;
     this.truncated = false;
     this.resetSerial += 1;
-    this.sendCommand({
-      type: "spawnBall",
-      xOffset: settings.xOffset,
-      yOffset: settings.yOffset,
-      zOffset: settings.zOffset,
-      velocityZ: settings.velocityZ
-    });
+    this.pendingSpawn = { ...settings };
+    this.flushPendingSpawn();
     return this.snapshot();
   }
 
@@ -209,6 +205,7 @@ export class MujocoWorld {
       this.liveConnected = true;
       this.policyMessage = "Python live backend connected";
       this.sendCommand({ type: "playback", playback: this.playback });
+      this.flushPendingSpawn();
     });
 
     this.socket.addEventListener("message", (event) => {
@@ -240,11 +237,33 @@ export class MujocoWorld {
     });
   }
 
-  private sendCommand(command: Record<string, unknown>): void {
+  private sendCommand(command: Record<string, unknown>): boolean {
     if (!this.socket || this.socket.readyState !== WebSocket.OPEN) {
-      return;
+      return false;
     }
     this.socket.send(JSON.stringify(command));
+    return true;
+  }
+
+  private flushPendingSpawn(): void {
+    if (!this.pendingSpawn) {
+      return;
+    }
+
+    const settings = this.pendingSpawn;
+    const sent = this.sendCommand({
+      type: "spawnBall",
+      xOffset: settings.xOffset,
+      yOffset: settings.yOffset,
+      zOffset: settings.zOffset,
+      velocityX: settings.velocityX,
+      velocityY: settings.velocityY,
+      velocityZ: settings.velocityZ
+    });
+
+    if (sent) {
+      this.pendingSpawn = null;
+    }
   }
 
   private applyLiveFrame(frame: LiveFrame): void {

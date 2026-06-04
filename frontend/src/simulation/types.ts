@@ -21,6 +21,8 @@ export interface BallSpawnSettings {
   xOffset: number;
   yOffset: number;
   zOffset: number;
+  velocityX: number;
+  velocityY: number;
   velocityZ: number;
 }
 
@@ -67,6 +69,8 @@ export const DEFAULT_BALL_SPAWN: BallSpawnSettings = {
   xOffset: 0,
   yOffset: 0,
   zOffset: 0.34,
+  velocityX: 0,
+  velocityY: 0,
   velocityZ: 0
 };
 

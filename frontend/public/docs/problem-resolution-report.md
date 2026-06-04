@@ -20,7 +20,7 @@
 - Python backend가 정적 파일 서빙, health check, config, live simulation을 모두 담당하므로 Spring 백엔드를 제거했다.
 - 정책 모델 경로는 `.env`의 `PINGPONG_POLICY_MODEL_PATH`로 관리한다. 현재 기본값은 v25 모델이다.
 - FastAPI 기본 docs route를 꺼서 `/docs`가 React Docs 페이지로 연결되게 했다.
-- 공 위치 조절 기능을 live backend 구조에 맞게 복구했다. Ball Reset 컨트롤은 Python env의 `reset(options=...)` 경로로 `ball_height`, `ball_xy_offset`, `ball_velocity`를 보낸다.
+- 공 위치 조절 기능을 live backend 구조에 맞게 복구했다. Ball Spawn 컨트롤은 Python sim의 공 freejoint만 재배치하며, `x/y/z offset`과 초기 `x/y/z velocity`를 보낸다.
 - reset, contact, floor contact, episode 전환 시 `resetSerial`을 증가시켜 trajectory trail과 contact marker가 안정적으로 초기화되게 했다.
 - 로딩 overlay를 추가하고 simulation canvas를 lazy chunk로 분리해서, 첫 화면 shell은 더 빨리 보이고 사용자가 현재 로딩 상태를 알 수 있게 했다.
 - 로딩 완료 전에는 fallback physics loop를 돌리지 않도록 해서 time/height가 준비 전부터 변하지 않게 했다.

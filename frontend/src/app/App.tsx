@@ -42,7 +42,7 @@ export function App() {
     setResetSignal((value) => value + 1);
   }, []);
 
-  const applyBallSpawn = useCallback((value: BallSpawnSettings) => {
+  const updateBallSpawn = useCallback((value: BallSpawnSettings) => {
     setPlayback("paused");
     setBallSpawn(value);
     setBallSpawnSignal((signal) => signal + 1);
@@ -128,7 +128,7 @@ export function App() {
                       </div>
                     </div>
 
-                    <BallControls value={ballSpawn} onChange={setBallSpawn} onApply={applyBallSpawn} />
+                    <BallControls value={ballSpawn} onChange={updateBallSpawn} />
                     <CameraControls value={cameraMode} onChange={setCameraMode} />
                     <VisualizationToggles value={visualization} onChange={setVisualization} />
 

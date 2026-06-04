@@ -387,7 +387,7 @@ button {
 
 .range-row {
   display: grid;
-  grid-template-columns: 68px minmax(0, 1fr) 58px;
+  grid-template-columns: 78px minmax(0, 1fr) 58px;
   align-items: center;
   gap: 10px;
   color: var(--muted);
@@ -427,6 +427,10 @@ button {
   border-color: var(--line);
   background: #202020;
   color: #e4e4e4;
+}
+
+.action-button.full {
+  grid-column: 1 / -1;
 }
 
 .action-button:hover {
