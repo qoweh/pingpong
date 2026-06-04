@@ -43,20 +43,26 @@ export function DocsPage() {
         <h1>Documentation</h1>
       </section>
 
-      <nav className="docs-grid docs-page-grid" aria-label="Documentation sections">
-        {DOCS.map((doc) => (
-          <a href={`#${doc.id}`} key={doc.path}>
-            {doc.title}
-          </a>
-        ))}
-      </nav>
+      <div className="docs-layout">
+        <aside className="docs-sidebar" aria-label="Documentation sections">
+          <nav>
+            <span>Sections</span>
+            {DOCS.map((doc, index) => (
+              <a href={`#${doc.id}`} key={doc.path}>
+                <small>{String(index + 1).padStart(2, "0")}</small>
+                <strong>{doc.title}</strong>
+              </a>
+            ))}
+          </nav>
+        </aside>
 
-      <div className="docs-stack">
-        {DOCS.map((doc) => (
-          <article className="doc-section" id={doc.id} key={doc.path}>
-            <MarkdownDocument content={contentByPath[doc.path] ?? "문서를 불러오는 중입니다."} />
-          </article>
-        ))}
+        <div className="docs-stack">
+          {DOCS.map((doc) => (
+            <article className="doc-section" id={doc.id} key={doc.path}>
+              <MarkdownDocument content={contentByPath[doc.path] ?? "문서를 불러오는 중입니다."} />
+            </article>
+          ))}
+        </div>
       </div>
     </main>
   );

@@ -476,27 +476,6 @@ select {
   line-height: 1.45;
 }
 
-.docs-grid {
-  display: grid;
-  grid-template-columns: repeat(6, minmax(0, 1fr));
-  gap: 10px;
-}
-
-.docs-grid a {
-  min-height: 58px;
-  padding: 14px;
-  border: 1px solid var(--line);
-  border-radius: 7px;
-  background: #181818;
-  color: #e5e5e5;
-  font-size: 0.88rem;
-}
-
-.docs-grid a:hover {
-  border-color: rgba(50, 213, 164, 0.5);
-  color: white;
-}
-
 .docs-page {
   width: min(1180px, 100%);
   margin: 0 auto;
@@ -510,8 +489,66 @@ select {
   letter-spacing: 0;
 }
 
-.docs-page-grid {
-  padding: 0 0 28px;
+.docs-layout {
+  display: grid;
+  grid-template-columns: 220px minmax(0, 1fr);
+  align-items: start;
+  gap: 24px;
+}
+
+.docs-sidebar {
+  position: sticky;
+  top: 88px;
+}
+
+.docs-sidebar nav {
+  display: grid;
+  overflow: hidden;
+  border: 1px solid var(--line);
+  border-radius: 7px;
+  background: #181818;
+}
+
+.docs-sidebar nav > span {
+  padding: 12px 14px;
+  border-bottom: 1px solid var(--line);
+  color: var(--muted);
+  font-size: 0.75rem;
+  font-weight: 760;
+  text-transform: uppercase;
+}
+
+.docs-sidebar a {
+  display: grid;
+  grid-template-columns: 34px minmax(0, 1fr);
+  align-items: center;
+  gap: 10px;
+  min-height: 46px;
+  padding: 0 14px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+  color: #e0e0e0;
+  font-size: 0.9rem;
+}
+
+.docs-sidebar a:last-child {
+  border-bottom: 0;
+}
+
+.docs-sidebar a:hover {
+  background: rgba(255, 255, 255, 0.04);
+  color: white;
+}
+
+.docs-sidebar small {
+  color: var(--accent);
+  font: 0.76rem/1 ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
+}
+
+.docs-sidebar strong {
+  overflow: hidden;
+  font-weight: 640;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .docs-stack {
@@ -674,8 +711,26 @@ select {
     margin-top: 0;
   }
 
-  .docs-grid {
-    grid-template-columns: repeat(3, minmax(0, 1fr));
+  .docs-layout {
+    grid-template-columns: 1fr;
+  }
+
+  .docs-sidebar {
+    position: static;
+  }
+
+  .docs-sidebar nav {
+    grid-template-columns: repeat(5, minmax(150px, 1fr));
+    overflow-x: auto;
+  }
+
+  .docs-sidebar nav > span {
+    display: none;
+  }
+
+  .docs-sidebar a {
+    border-right: 1px solid rgba(255, 255, 255, 0.06);
+    border-bottom: 0;
   }
 }
 
@@ -722,7 +777,17 @@ select {
     grid-template-columns: 1fr;
   }
 
-  .docs-grid {
-    grid-template-columns: 1fr;
+  .docs-sidebar nav {
+    grid-template-columns: repeat(5, minmax(132px, 1fr));
+  }
+
+  .docs-sidebar a {
+    min-height: 42px;
+    padding: 0 12px;
+    font-size: 0.84rem;
+  }
+
+  .doc-section {
+    padding: 18px;
   }
 }

@@ -50,9 +50,9 @@ export class ThreeScene {
       this.host.appendChild(this.cameraDebug);
     }
 
-    const target = mujocoToThree([0.45, 0, 0.72]);
+    const target = mujocoToThree([0.385, 0.03, 0.617]);
     this.cameras = {
-      free: perspectiveCamera(mujocoToThree([0.28, 1.887, 0.87]), target, 42),
+      free: perspectiveCamera(mujocoToThree([0.399, 1.872, 0.802]), target, 42),
       north: perspectiveCamera(mujocoToThree([0.45, -2.25, 1.0]), target),
       south: perspectiveCamera(mujocoToThree([0.45, 2.25, 1.0]), target),
       east: perspectiveCamera(mujocoToThree([2.2, 0, 1.0]), target),
