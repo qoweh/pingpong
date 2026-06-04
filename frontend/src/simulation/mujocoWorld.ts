@@ -5,7 +5,6 @@ import { loadMujocoModule } from "./mujocoLoader";
 import type {
   BallSpawnSettings,
   ContactEvent,
-  DemoConfig,
   PlaybackState,
   SimulationSnapshot,
   Vec3
@@ -71,7 +70,7 @@ export class MujocoWorld {
   private pendingSpawn: BallSpawnSettings | null = null;
   private liveReady = false;
   private liveConnected = false;
-  private playback: PlaybackState = "paused";
+  private playback: PlaybackState = "playing";
   private contactCount = 0;
   private contactEvent = false;
   private lastContact: ContactEvent | null = null;
@@ -87,7 +86,7 @@ export class MujocoWorld {
   private racketAnchor: Vec3 = [...ZERO_SNAPSHOT.racketPosition] as Vec3;
   private policyMessage = "Connecting to Python live backend";
 
-  async initialize(_config: DemoConfig): Promise<void> {
+  async initialize(): Promise<void> {
     const [module, manifest] = await Promise.all([loadMujocoModule(), loadAssetManifest()]);
 
     this.module = module;

@@ -101,7 +101,7 @@ async def receive_commands(websocket: WebSocket, state: LiveCommandState) -> Non
                 playback = message.get("playback")
                 if playback in {"playing", "paused"}:
                     state.playback = playback
-            elif message_type in {"spawnBall", "resetBall"}:
+            elif message_type == "spawnBall":
                 state.ball_spawn_options = parse_ball_spawn_options(message)
                 state.ball_spawn_requested = True
     except WebSocketDisconnect:
@@ -111,7 +111,7 @@ async def receive_commands(websocket: WebSocket, state: LiveCommandState) -> Non
 def parse_ball_spawn_options(message: dict[str, Any]) -> dict[str, Any]:
     x_offset = clamp_float(message.get("xOffset"), -0.2, 0.2, 0.0)
     y_offset = clamp_float(message.get("yOffset"), -0.2, 0.2, 0.0)
-    z_offset = clamp_float(message.get("zOffset", message.get("height")), 0.08, 0.9, 0.34)
+    z_offset = clamp_float(message.get("zOffset"), 0.08, 0.9, 0.34)
     velocity_x = clamp_float(message.get("velocityX"), -1.0, 1.0, 0.0)
     velocity_y = clamp_float(message.get("velocityY"), -1.0, 1.0, 0.0)
     velocity_z = clamp_float(message.get("velocityZ"), -1.0, 1.0, 0.0)

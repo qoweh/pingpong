@@ -1,7 +1,7 @@
 import * as THREE from "three";
 import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
 
-import type { CameraMode, DemoConfig, SimulationSnapshot, VisualizationSettings, Vec3 } from "../simulation/types";
+import type { CameraMode, DemoConfig, SimulationSnapshot, VisualizationSettings } from "../simulation/types";
 import type { MujocoWorld } from "../simulation/mujocoWorld";
 import { MujocoModelScene, mujocoToThree } from "./mujocoModelScene";
 

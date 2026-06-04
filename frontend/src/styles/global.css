@@ -475,12 +475,6 @@ select {
   line-height: 1.45;
 }
 
-.docs-band {
-  width: min(1480px, 100%);
-  margin: 0 auto;
-  padding: 28px 28px 38px;
-}
-
 .docs-grid {
   display: grid;
   grid-template-columns: repeat(6, minmax(0, 1fr));
@@ -607,12 +601,6 @@ select {
   .nav-links {
     gap: 10px;
     font-size: 0.84rem;
-  }
-
-  .demo-band,
-  .docs-band {
-    padding-left: 14px;
-    padding-right: 14px;
   }
 
   .docs-page {

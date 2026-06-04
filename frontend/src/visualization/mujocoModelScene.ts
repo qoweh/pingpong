@@ -10,7 +10,8 @@ type MujocoRuntime = {
 const VISIBLE_GROUP_LIMIT = 3;
 const MUJOCO_TEXTURE_ROLE_COUNT = 10;
 const MUJOCO_RGB_TEXTURE_ROLE = 1;
-const FLOOR_SIZE_METERS = 4.8;
+const FLOOR_SIZE_METERS = 48;
+const FLOOR_TILE_SIZE_METERS = 0.15;
 
 export class MujocoModelScene {
   readonly root = new THREE.Group();
@@ -27,7 +28,7 @@ export class MujocoModelScene {
   }
 
   update(): void {
-    const { model, data } = this.runtime;
+    const { data } = this.runtime;
 
     for (const [bodyId, body] of this.bodies) {
       setThreePosition(data.xpos, bodyId, body.position);
@@ -271,7 +272,8 @@ export class MujocoModelScene {
     }
 
     const texture = new THREE.DataTexture(data, size, size, THREE.RGBAFormat, THREE.UnsignedByteType);
-    texture.repeat.set(16, 16);
+    const repeats = FLOOR_SIZE_METERS / (FLOOR_TILE_SIZE_METERS * cells);
+    texture.repeat.set(repeats, repeats);
     texture.wrapS = THREE.RepeatWrapping;
     texture.wrapT = THREE.RepeatWrapping;
     texture.colorSpace = THREE.SRGBColorSpace;

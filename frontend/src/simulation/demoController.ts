@@ -16,14 +16,13 @@ type StatusListener = (message: string) => void;
 export class DemoController {
   private readonly world = new MujocoWorld();
   private readonly renderer: ThreeScene;
-  private playback: PlaybackState = "paused";
+  private playback: PlaybackState = "playing";
   private visualization: VisualizationSettings = { ...DEFAULT_VISUALIZATION };
   private cameraMode: CameraMode = "free";
   private config: DemoConfig = { ...DEFAULT_DEMO_CONFIG };
   private animationFrame = 0;
   private previousTimestamp = 0;
   private snapshot: SimulationSnapshot = ZERO_SNAPSHOT;
-  private initialized = false;
   private lastSnapshotEmit = 0;
 
   constructor(
@@ -39,8 +38,7 @@ export class DemoController {
     this.onStatus("Loading MuJoCo WASM");
 
     try {
-      await this.world.initialize(this.config);
-      this.initialized = true;
+      await this.world.initialize();
       this.snapshot = this.world.reset();
       this.world.setPlayback(this.playback);
       this.renderer.loadWorld(this.world);
@@ -49,7 +47,6 @@ export class DemoController {
       this.loop(0);
     } catch (error) {
       this.onStatus(error instanceof Error ? error.message : "MuJoCo failed to load");
-      this.initialized = false;
       this.snapshot = ZERO_SNAPSHOT;
       this.emit(true);
     }
