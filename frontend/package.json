@@ -10,9 +10,8 @@
     "preview": "vite preview --host 0.0.0.0 --port 4173"
   },
   "dependencies": {
-    "@mujoco/mujoco": "3.9.0",
+    "@mujoco/mujoco": "^3.8.0",
     "lucide-react": "1.17.0",
-    "onnxruntime-web": "1.26.0",
     "react": "19.2.7",
     "react-dom": "19.2.7",
     "three": "0.184.0"

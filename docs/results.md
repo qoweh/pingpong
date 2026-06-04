@@ -7,10 +7,10 @@ Current web artifact status:
 | MuJoCo model serving | Added |
 | Three.js viewer | Added |
 | PPO source zip retained | Added |
-| Browser policy JSON export | Added |
-| Live PPO inference in browser | Pending |
+| Python rollout export | Added |
+| MuJoCo WASM replay | Added |
 
-Evaluation metrics to add after final policy export:
+Evaluation metrics to add after rollout export:
 
 - Average keep-up duration
 - Success rate

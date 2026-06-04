@@ -43,7 +43,6 @@ export interface SimulationSnapshot {
 export interface DemoConfig {
   targetHeight: number;
   heightTolerance: number;
-  ballPosition: Vec3;
 }
 
 export const DEFAULT_VISUALIZATION: VisualizationSettings = {
@@ -55,8 +54,7 @@ export const DEFAULT_VISUALIZATION: VisualizationSettings = {
 
 export const DEFAULT_DEMO_CONFIG: DemoConfig = {
   targetHeight: 0.3,
-  heightTolerance: 0.1,
-  ballPosition: [0, 0, 0.34]
+  heightTolerance: 0.1
 };
 
 export const ZERO_SNAPSHOT: SimulationSnapshot = {

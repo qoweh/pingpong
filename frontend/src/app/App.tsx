@@ -1,7 +1,6 @@
 import { ExternalLink } from "lucide-react";
 import { useCallback, useState } from "react";
 
-import { BallControls } from "../controls/BallControls";
 import { CameraControls } from "../controls/CameraControls";
 import { PlaybackControls } from "../controls/PlaybackControls";
 import { VisualizationToggles } from "../controls/VisualizationToggles";
@@ -11,7 +10,6 @@ import type {
   CameraMode,
   PlaybackState,
   SimulationSnapshot,
-  Vec3,
   VisualizationSettings
 } from "../simulation/types";
 import { DEFAULT_DEMO_CONFIG, DEFAULT_VISUALIZATION, ZERO_SNAPSHOT } from "../simulation/types";
@@ -21,7 +19,6 @@ const GITHUB_URL = "https://github.com/qoweh/pingpong";
 export function App() {
   const isDocsPage = window.location.pathname === "/docs";
   const [playback, setPlayback] = useState<PlaybackState>("playing");
-  const [ballPosition, setBallPosition] = useState<Vec3>(DEFAULT_DEMO_CONFIG.ballPosition);
   const [cameraMode, setCameraMode] = useState<CameraMode>("free");
   const [visualization, setVisualization] = useState<VisualizationSettings>(DEFAULT_VISUALIZATION);
   const [snapshot, setSnapshot] = useState<SimulationSnapshot>(ZERO_SNAPSHOT);
@@ -59,7 +56,6 @@ export function App() {
             <section className="viewer-pane" aria-label="MuJoCo simulation viewer">
               <SimulationCanvas
                 playback={playback}
-                ballPosition={ballPosition}
                 cameraMode={cameraMode}
                 visualization={visualization}
                 onSnapshot={setSnapshot}
@@ -102,12 +98,11 @@ export function App() {
                   <strong>{snapshot.time.toFixed(2)}s</strong>
                 </div>
                 <div>
-                  <span>Policy</span>
+                  <span>Trace</span>
                   <strong>{snapshot.policyLoaded ? "Loaded" : "Pending"}</strong>
                 </div>
               </div>
 
-              <BallControls value={ballPosition} onChange={setBallPosition} />
               <CameraControls value={cameraMode} onChange={setCameraMode} />
               <VisualizationToggles value={visualization} onChange={setVisualization} />
 

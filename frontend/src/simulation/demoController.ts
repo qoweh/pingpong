@@ -4,7 +4,6 @@ import type {
   DemoConfig,
   PlaybackState,
   SimulationSnapshot,
-  Vec3,
   VisualizationSettings
 } from "./types";
 import { DEFAULT_DEMO_CONFIG, DEFAULT_VISUALIZATION, ZERO_SNAPSHOT } from "./types";
@@ -42,7 +41,7 @@ export class DemoController {
     try {
       await this.world.initialize(this.config);
       this.initialized = true;
-      this.snapshot = this.world.reset(this.config.ballPosition);
+      this.snapshot = this.world.reset();
       this.renderer.loadWorld(this.world);
       this.onStatus("MuJoCo WASM loaded");
       this.emit(true);
@@ -73,14 +72,8 @@ export class DemoController {
     this.visualization = { ...visualization };
   }
 
-  setBallPosition(ballPosition: Vec3): void {
-    this.config = { ...this.config, ballPosition };
-    this.snapshot = this.world.setBallPosition(ballPosition);
-    this.emit(true);
-  }
-
   reset(): void {
-    this.snapshot = this.world.reset(this.config.ballPosition);
+    this.snapshot = this.world.reset();
     this.emit(true);
   }
 

@@ -5,13 +5,11 @@ import type {
   CameraMode,
   PlaybackState,
   SimulationSnapshot,
-  Vec3,
   VisualizationSettings
 } from "../simulation/types";
 
 interface SimulationCanvasProps {
   playback: PlaybackState;
-  ballPosition: Vec3;
   cameraMode: CameraMode;
   visualization: VisualizationSettings;
   onSnapshot: (snapshot: SimulationSnapshot) => void;
@@ -21,7 +19,6 @@ interface SimulationCanvasProps {
 
 export function SimulationCanvas({
   playback,
-  ballPosition,
   cameraMode,
   visualization,
   onSnapshot,
@@ -57,10 +54,6 @@ export function SimulationCanvas({
   useEffect(() => {
     controllerRef.current?.setVisualization(visualization);
   }, [visualization]);
-
-  useEffect(() => {
-    controllerRef.current?.setBallPosition(ballPosition);
-  }, [ballPosition]);
 
   useEffect(() => {
     if (resetSignal > 0) {

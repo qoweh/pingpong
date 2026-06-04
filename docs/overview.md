@@ -4,7 +4,7 @@ Ping-Pong Keep-Up with Reinforcement Learning shows a Franka Panda robot arm wit
 
 The browser demo runs the MuJoCo model with WebAssembly, renders the scene with Three.js, and exposes only the controls needed for the demo:
 
-- Ball position
+- Playback
 - Camera mode
 - Visualization toggles
 
@@ -12,7 +12,7 @@ System flow:
 
 ```text
 PPO training artifacts
--> browser-loadable policy export
+-> Python env/model rollout export
 -> MuJoCo WASM simulation
 -> Three.js rendering
 -> Spring Boot static serving

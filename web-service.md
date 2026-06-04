@@ -34,9 +34,8 @@ contact marker는 있으면 좋지만 MVP 필수는 아니다.
 ```text
 MuJoCo WASM 실행
 Three.js 렌더링
-학습된 PPO policy 실행
+Python에서 export한 rollout replay
 사용자 조작 UI 실행
-공 위치 조정
 카메라 시점 전환
 공 궤적 / 목표 높이 / 현재 높이 시각화
 4-camera view 표시 (하나의 viewer에서 on/off 해서 4개로 나눠지는 것으로 추가하면 좋을듯, 기본값 : off)
@@ -50,7 +49,7 @@ Three.js 렌더링
 React build 결과 제공
 MuJoCo WASM 파일 제공
 MuJoCo 모델 asset 제공
-최종 PPO policy 실행 파일 제공
+Python rollout replay 파일 제공
 Docs page 제공
 GitHub 링크 제공
 ```
@@ -68,7 +67,7 @@ MJCF/XML 파일
 mesh 파일
 texture 파일
 MuJoCo WASM 파일
-최종 PPO policy 실행 파일
+Python rollout replay 파일
 ```
 
 단, 이것들을 별도 API로 제공할 필요는 없다. Spring Boot가 정적 파일로 제공하면 된다.
@@ -196,7 +195,6 @@ MuJoCo WASM canvas
 Play
 Pause
 Reset
-공 위치 조정 패널
 카메라 선택 패널
 현재 공 높이 표시
 Contact count 표시
@@ -209,7 +207,7 @@ Step 버튼은 디버깅용으로만 필요하면 추가한다.
 MVP에서 사용자가 직접 만지는 항목은 최소화한다.
 
 ```text
-Ball position x/y/z
+Playback
 Camera mode
 Visualization toggle
 ```
@@ -584,12 +582,10 @@ project-root/
     public/
       assets/
         mujoco/
-          scene.xml
-          meshes/
-          textures/
-        policy/
-          final-policy.onnx
-          final-policy.json
+          pingpong_scene.mjb
+          asset-manifest.json
+        demo/
+          rollout.json
         images/
 
   backend/
@@ -610,7 +606,7 @@ project-root/
     results.md
 
   training-artifacts/
-    final-policy/
+    exported-rollouts/
     reward-curves/
     evaluation-results/
 
@@ -651,8 +647,7 @@ docker-compose.yml
 웹 화면 구현
 MuJoCo WASM 로드
 Three.js 렌더링
-PPO policy 실행
-공 위치 조정 UI
+Python rollout replay
 카메라 UI
 시각화 overlay 구현
 Docs page 렌더링
@@ -686,38 +681,31 @@ MJCF/XML 로드
 mj_step 실행
 mj_forward 호출
 qpos/qvel 접근
-공 위치 변경
-contact 정보 읽기
+export된 ctrl frame 적용
+contact metadata 반영
 ```
 
-## 10.4 frontend/src/policy/
+## 10.4 frontend/src/simulation/rolloutTrace.ts
 
 역할:
 
 ```text
-최종 PPO policy 실행 코드
+Python rollout replay JSON 로더
 ```
 
 파일 예시:
 
 ```text
-policyLoader.ts
-onnxRunner.ts
-mlpRunner.ts
-observationBuilder.ts
-actionMapper.ts
-normalization.ts
+rolloutTrace.ts
 ```
 
 주요 기능:
 
 ```text
-최종 policy 파일 로드
-observation vector 생성
-normalization 적용
-action 계산
-action clipping
-data.ctrl에 action 적용
+rollout.json 로드
+초기 MuJoCo qpos/qvel/ctrl 읽기
+step별 actuator ctrl 읽기
+contact metadata 읽기
 ```
 
 ## 10.5 frontend/src/visualization/
@@ -761,7 +749,6 @@ CameraRig.ts
 ```text
 DemoControls.tsx
 CameraControls.tsx
-BallControls.tsx
 VisualizationToggles.tsx
 PlaybackControls.tsx
 ```
@@ -770,7 +757,6 @@ PlaybackControls.tsx
 
 ```text
 Play / Pause / Reset
-공 위치 조정
 카메라 선택
 시각화 on/off
 ```
@@ -786,28 +772,25 @@ Play / Pause / Reset
 파일 예시:
 
 ```text
-scene.xml
-meshes/*.stl
-meshes/*.obj
-textures/*
+pingpong_scene.mjb
+asset-manifest.json
 ```
 
-## 10.8 frontend/public/assets/policy/
+## 10.8 frontend/public/assets/demo/
 
 역할:
 
 ```text
-브라우저에서 실행할 최종 PPO policy 파일 보관
+Python 원본 env/model/policy에서 export한 웹 replay 파일 보관
 ```
 
 파일 예시:
 
 ```text
-final-policy.onnx
-final-policy.json
+rollout.json
 ```
 
-둘 다 둘 필요는 없다. 실제 구현에서 선택한 방식 하나만 둔다.
+브라우저는 PPO policy를 직접 추론하지 않고 rollout의 actuator ctrl을 MuJoCo WASM에 replay한다.
 
 ## 10.9 frontend/public/assets/images/
 
@@ -875,13 +858,13 @@ GitHub에서도 읽을 수 있는 프로젝트 설명 문서 관리
 ```text
 학습 결과 요약 자료 보관
 웹 문서에 넣을 그래프 원본 보관
-최종 policy export 파일 보관
+웹 replay export 파일 보관
 ```
 
 파일 예시:
 
 ```text
-final-policy/
+exported-rollouts/
 reward-curves/episode_reward.csv
 evaluation-results/summary.json
 ```
@@ -1040,9 +1023,8 @@ MJCF/XML asset 로딩 구현
 Three.js scene 구성
 로봇팔 / 탁구채 / 탁구공 렌더링
 시뮬레이션 step loop 구현
-최종 PPO policy 실행 loop 구현
+Python rollout replay loop 구현
 Play / Pause / Reset 구현
-공 위치 조정 UI 구현
 카메라 모드 구현
 4-camera layout 구현
 trajectory trail 구현
@@ -1212,7 +1194,6 @@ Main page:
 - Hero
 - Live Demo
 - Play / Pause / Reset
-- Ball position control
 - Camera selector
 - 4-Camera View
 - Current ball height
@@ -1222,7 +1203,7 @@ Main page:
 - Docs link
 
 User controls:
-- Ball position x/y/z
+- Playback
 - Camera mode
 - Visualization on/off
 
