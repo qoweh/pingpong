@@ -1,6 +1,6 @@
 # Reward Function
 
-The active v28 training configuration focuses on contact quality and recoverable next-ball states.
+The active v25 training configuration focuses on contact quality and recoverable next-ball states.
 
 Main terms:
 

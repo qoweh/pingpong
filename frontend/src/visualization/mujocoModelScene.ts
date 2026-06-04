@@ -1,5 +1,6 @@
 import * as THREE from "three";
 import type { MainModule, MjData, MjModel } from "@mujoco/mujoco";
+import { mergeVertices } from "three/examples/jsm/utils/BufferGeometryUtils.js";
 
 type MujocoRuntime = {
   module: MainModule;
@@ -68,12 +69,12 @@ export class MujocoModelScene {
       const bodyId = Number(model.geom_bodyid[geomId]);
       const geomType = Number(model.geom_type[geomId]);
       const size = readVec3(model.geom_size, geomId);
-      const geometry = this.createGeometry(module, model, geomId, geomType, size, meshCache);
+      const geomName = readName(model.names, model.name_geomadr?.[geomId]);
+      const geometry = this.createGeometry(module, model, geomId, geomName, geomType, size, meshCache);
       if (!geometry) {
         continue;
       }
 
-      const geomName = readName(model.names, model.name_geomadr?.[geomId]);
       const material = this.createMaterial(model, geomId, geomType, geomName);
       const mesh = new THREE.Mesh(geometry, material);
       mesh.name = geomName;
@@ -110,10 +111,15 @@ export class MujocoModelScene {
     module: MainModule,
     model: MjModel,
     geomId: number,
+    geomName: string,
     geomType: number,
     size: [number, number, number],
     meshCache: Map<number, THREE.BufferGeometry>
   ): THREE.BufferGeometry | null {
+    if (geomName === "racket_head_back") {
+      return null;
+    }
+
     if (geomType === module.mjtGeom.mjGEOM_PLANE.value) {
       return this.registerGeometry(new THREE.PlaneGeometry(100, 100).rotateX(-Math.PI / 2));
     }
@@ -127,7 +133,10 @@ export class MujocoModelScene {
     }
 
     if (geomType === module.mjtGeom.mjGEOM_CYLINDER.value) {
-      return this.registerGeometry(new THREE.CylinderGeometry(size[0], size[0], size[1] * 2, 48));
+      if (geomName === "racket_rim") {
+        return this.registerGeometry(new THREE.TorusGeometry(size[0], size[2] || 0.0045, 12, 96).rotateX(Math.PI / 2));
+      }
+      return this.registerGeometry(new THREE.CylinderGeometry(size[0], size[0], size[1] * 2, 96));
     }
 
     if (geomType === module.mjtGeom.mjGEOM_BOX.value) {
@@ -154,14 +163,18 @@ export class MujocoModelScene {
   }
 
   private createMaterial(model: MjModel, geomId: number, geomType: number, geomName: string): THREE.Material {
+    const racketMaterial = this.createRacketMaterial(geomName);
+    if (racketMaterial) {
+      return racketMaterial;
+    }
+
     if (geomType === this.runtime.module.mjtGeom.mjGEOM_PLANE.value || geomName === "floor") {
       const texture = this.createCheckerTexture();
-      const material = new THREE.MeshPhysicalMaterial({
+      const material = new THREE.MeshStandardMaterial({
         color: new THREE.Color(0x7aa6c9),
         map: texture,
         metalness: 0,
         roughness: 0.52,
-        reflectivity: 0.18,
         side: THREE.DoubleSide
       });
       this.materials.push(material);
@@ -173,19 +186,62 @@ export class MujocoModelScene {
     const alpha = clamp01(color[3] ?? 1);
     const texture = materialId >= 0 ? this.createTexture(model, materialId) : null;
 
-    const parameters: THREE.MeshPhysicalMaterialParameters = {
+    const parameters: THREE.MeshStandardMaterialParameters = {
       color: new THREE.Color(color[0], color[1], color[2]),
       metalness: materialId >= 0 ? clamp01(Number(model.mat_metallic?.[materialId] ?? 0)) : 0,
-      roughness: materialId >= 0 ? Math.max(0.35, clamp01(Number(model.mat_roughness?.[materialId] ?? 0.55))) : 0.5,
+      roughness: materialId >= 0 ? Math.max(0.48, clamp01(Number(model.mat_roughness?.[materialId] ?? 0.62))) : 0.62,
       transparent: alpha < 0.999,
       opacity: alpha,
-      side: THREE.DoubleSide
+      side: THREE.FrontSide
     };
     if (texture) {
       parameters.map = texture;
     }
 
-    const material = new THREE.MeshPhysicalMaterial(parameters);
+    const material = new THREE.MeshStandardMaterial(parameters);
+
+    this.materials.push(material);
+    return material;
+  }
+
+  private createRacketMaterial(geomName: string): THREE.Material | null {
+    let material: THREE.MeshStandardMaterial | null = null;
+    if (geomName === "racket_head") {
+      material = new THREE.MeshStandardMaterial({
+        color: 0xb91c1c,
+        roughness: 0.74,
+        metalness: 0,
+        side: THREE.FrontSide,
+        polygonOffset: true,
+        polygonOffsetFactor: -1,
+        polygonOffsetUnits: -1
+      });
+    } else if (geomName === "racket_rim") {
+      material = new THREE.MeshStandardMaterial({
+        color: 0xd8c89f,
+        roughness: 0.52,
+        metalness: 0,
+        side: THREE.FrontSide
+      });
+    } else if (geomName === "racket_handle_core") {
+      material = new THREE.MeshStandardMaterial({
+        color: 0x7c4f24,
+        roughness: 0.72,
+        metalness: 0,
+        side: THREE.FrontSide
+      });
+    } else if (geomName === "racket_handle_grip") {
+      material = new THREE.MeshStandardMaterial({
+        color: 0x111111,
+        roughness: 0.82,
+        metalness: 0,
+        side: THREE.FrontSide
+      });
+    }
+
+    if (!material) {
+      return null;
+    }
 
     this.materials.push(material);
     return material;
@@ -285,45 +341,17 @@ function createMeshGeometry(model: MjModel, meshId: number): THREE.BufferGeometr
   geometry.setAttribute("position", new THREE.BufferAttribute(vertices, 3));
   geometry.setIndex(new THREE.BufferAttribute(index, 1));
 
-  geometry.computeVertexNormals();
-
   const uvAttribute = createUvAttribute(model, meshId, vertices.length / 3);
   if (uvAttribute) {
     geometry.setAttribute("uv", uvAttribute);
   }
 
-  geometry.computeBoundingSphere();
-  return geometry;
-}
+  const merged = mergeVertices(geometry, 1.0e-5);
+  merged.computeVertexNormals();
 
-function createNormalAttribute(model: MjModel, meshId: number, vertexValueCount: number): THREE.BufferAttribute | null {
-  if (Number(model.mesh_normaladr[meshId]) < 0 || Number(model.mesh_normalnum[meshId]) <= 0) {
-    return null;
-  }
-
-  const normalStart = Number(model.mesh_normaladr[meshId]) * 3;
-  const normalEnd = normalStart + Number(model.mesh_normalnum[meshId]) * 3;
-  const sourceNormals = model.mesh_normal.subarray(normalStart, normalEnd);
-  const normals = new Float32Array(vertexValueCount);
-
-  const faceStart = Number(model.mesh_faceadr[meshId]) * 3;
-  const faceEnd = faceStart + Number(model.mesh_facenum[meshId]) * 3;
-  const faceVertices = model.mesh_face.subarray(faceStart, faceEnd);
-  const faceNormals = model.mesh_facenormal.subarray(faceStart, faceEnd);
-
-  for (let index = 0; index < faceVertices.length; index += 1) {
-    const vertexId = Number(faceVertices[index]);
-    const normalId = Number(faceNormals[index]);
-    if (normalId < 0) {
-      continue;
-    }
-
-    normals[vertexId * 3] = Number(sourceNormals[normalId * 3]);
-    normals[vertexId * 3 + 1] = Number(sourceNormals[normalId * 3 + 2]);
-    normals[vertexId * 3 + 2] = -Number(sourceNormals[normalId * 3 + 1]);
-  }
-
-  return new THREE.BufferAttribute(normals, 3);
+  merged.computeBoundingSphere();
+  geometry.dispose();
+  return merged;
 }
 
 function createUvAttribute(model: MjModel, meshId: number, vertexCount: number): THREE.BufferAttribute | null {

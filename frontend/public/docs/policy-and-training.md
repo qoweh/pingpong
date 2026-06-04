@@ -3,7 +3,7 @@
 Current source model:
 
 ```text
-pmk_cf_self_rally_v28_robot_base_disk_model.zip
+PINGPONG_POLICY_MODEL_PATH=rl/artifacts/pmk_cf_self_rally_v25/pmk_cf_self_rally_v25_model.zip
 ```
 
 Browser artifact:
@@ -17,8 +17,8 @@ Training summary:
 | Setting | Value |
 | --- | --- |
 | Algorithm | PPO |
-| Run version | v28_robot_base_disk |
-| Total timesteps | 2,000,000 |
+| Run version | v25 |
+| Total timesteps | 500,000 |
 | Parallel environments | 4 |
 | n_steps | 512 |
 | Batch size | 512 |
@@ -31,4 +31,4 @@ Training summary:
 
 Browser policy status:
 
-The PPO actor weights are exported to JSON MLP format. Browser execution still needs the Python environment's action mapper/controller logic to be ported before those actions can be applied correctly to MuJoCo control values.
+The PPO actor weights are exported to JSON MLP format from `PINGPONG_POLICY_MODEL_PATH`. The browser runs the JSON actor and maps its contact-frame command through a MuJoCo Jacobian racket controller.

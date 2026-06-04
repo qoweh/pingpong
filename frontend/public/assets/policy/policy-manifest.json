@@ -1,9 +1,9 @@
 {
   "format": "json-mlp",
-  "name": "pmk_cf_self_rally_v28_robot_base_disk",
+  "name": "pmk_cf_self_rally_v25",
   "file": "/assets/policy/final-policy.json",
-  "sourceModel": "rl/artifacts/pmk_cf_self_rally_v28_robot_base_disk/pmk_cf_self_rally_v28_robot_base_disk_model.zip",
+  "sourceModel": "rl/artifacts/pmk_cf_self_rally_v25/pmk_cf_self_rally_v25_model.zip",
   "observationSize": 55,
   "actionSize": 15,
-  "message": "PPO actor weights are exported. Browser action mapper/controller port is still pending."
+  "message": "PPO actor weights are exported from PINGPONG_POLICY_MODEL_PATH."
 }

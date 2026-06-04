@@ -66,6 +66,8 @@ export class ThreeScene {
     key.shadow.mapSize.height = 1024;
     key.shadow.camera.near = 0.1;
     key.shadow.camera.far = 10;
+    key.shadow.bias = -0.00003;
+    key.shadow.normalBias = 0.02;
     this.scene.add(key.target);
     this.scene.add(key);
 
