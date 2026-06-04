@@ -14,6 +14,9 @@ const BALL_JOINT_NAME = "ball_joint";
 const RACKET_GEOM_NAME = "racket_head";
 const RACKET_SITE_NAME = "racket_center";
 const MAX_PHYSICS_STEPS = 32;
+const BALL_MIN_Z = -0.2;
+const BALL_MAX_Z = 2.6;
+const BALL_MAX_XY = 3.0;
 
 type MujocoIds = {
   ballBody: number;
@@ -39,6 +42,7 @@ export class MujocoWorld {
   private fallbackTime = 0;
   private fallbackBallPosition: Vec3 = [...ZERO_SNAPSHOT.ball.position] as Vec3;
   private fallbackBallVelocity: Vec3 = [0, 0, 0];
+  private spawnPosition: Vec3 = [...ZERO_SNAPSHOT.ball.position] as Vec3;
   private policyMessage = "Policy not loaded";
 
   async initialize(config: DemoConfig): Promise<void> {
@@ -103,6 +107,7 @@ export class MujocoWorld {
 
     this.module.mj_resetDataKeyframe(this.model, this.data, 0);
     this.applyHomeCtrl();
+    this.spawnPosition = [...ballPosition] as Vec3;
     this.spawnBall(ballPosition, [0, 0, 0]);
     this.module.mj_forward(this.model, this.data);
     this.contactCount = 0;
@@ -119,6 +124,7 @@ export class MujocoWorld {
     }
 
     this.spawnBall(ballPosition, [0, 0, 0]);
+    this.spawnPosition = [...ballPosition] as Vec3;
     this.module.mj_forward(this.model, this.data);
     return this.snapshot();
   }
@@ -135,6 +141,7 @@ export class MujocoWorld {
       this.applyPolicyAction();
       this.module.mj_step(this.model, this.data);
       this.updateContactState();
+      this.respawnBallIfOutOfBounds();
     }
 
     return this.snapshot();
@@ -268,6 +275,28 @@ export class MujocoWorld {
     }
 
     this.contactActive = active;
+  }
+
+  private respawnBallIfOutOfBounds(): void {
+    if (!this.module || !this.model || !this.data || !this.ids) {
+      return;
+    }
+
+    const position = arrayVec3(this.data.xpos, this.ids.ballBody * 3);
+    const outOfBounds =
+      !position.every(Number.isFinite) ||
+      Math.abs(position[0]) > BALL_MAX_XY ||
+      Math.abs(position[1]) > BALL_MAX_XY ||
+      position[2] < BALL_MIN_Z ||
+      position[2] > BALL_MAX_Z;
+
+    if (!outOfBounds) {
+      return;
+    }
+
+    this.spawnBall(this.spawnPosition, [0, 0, 0]);
+    this.contactActive = false;
+    this.module.mj_forward(this.model, this.data);
   }
 
   private snapshot(): SimulationSnapshot {

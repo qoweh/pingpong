@@ -24,6 +24,7 @@ export class DemoController {
   private previousTimestamp = 0;
   private snapshot: SimulationSnapshot = ZERO_SNAPSHOT;
   private initialized = false;
+  private lastSnapshotEmit = 0;
 
   constructor(
     host: HTMLElement,
@@ -42,13 +43,14 @@ export class DemoController {
       await this.world.initialize(this.config);
       this.initialized = true;
       this.snapshot = this.world.reset(this.config.ballPosition);
+      this.renderer.loadWorld(this.world);
       this.onStatus("MuJoCo WASM loaded");
-      this.emit();
+      this.emit(true);
     } catch (error) {
       this.onStatus(error instanceof Error ? error.message : "MuJoCo failed to load");
       this.initialized = false;
       this.snapshot = ZERO_SNAPSHOT;
-      this.emit();
+      this.emit(true);
     }
   }
 
@@ -74,12 +76,12 @@ export class DemoController {
   setBallPosition(ballPosition: Vec3): void {
     this.config = { ...this.config, ballPosition };
     this.snapshot = this.world.setBallPosition(ballPosition);
-    this.emit();
+    this.emit(true);
   }
 
   reset(): void {
     this.snapshot = this.world.reset(this.config.ballPosition);
-    this.emit();
+    this.emit(true);
   }
 
   private readonly resize = (): void => {
@@ -100,7 +102,13 @@ export class DemoController {
     this.animationFrame = requestAnimationFrame(this.loop);
   };
 
-  private emit(): void {
+  private emit(force = false): void {
+    const now = performance.now();
+    if (!force && now - this.lastSnapshotEmit < 100) {
+      return;
+    }
+
+    this.lastSnapshotEmit = now;
     this.onSnapshot(this.snapshot);
   }
 }

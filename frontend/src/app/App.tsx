@@ -50,17 +50,6 @@ export function App() {
 
       <main>
         <section className="demo-band" id="demo">
-          <div className="demo-heading">
-            <div>
-              <h1>Ping-Pong Keep-Up with Reinforcement Learning</h1>
-              <p>A browser-based MuJoCo WebAssembly demo of a PPO policy keeping a ping-pong ball in the air.</p>
-            </div>
-            <div className="runtime-status">
-              <span className={snapshot.mujocoLoaded ? "status-dot ready" : "status-dot"} />
-              <span>{snapshot.mujocoLoaded ? "MuJoCo WASM" : status}</span>
-            </div>
-          </div>
-
           <div className="demo-layout">
             <section className="viewer-pane" aria-label="MuJoCo simulation viewer">
               <SimulationCanvas
@@ -72,6 +61,14 @@ export function App() {
                 onStatus={setStatus}
                 resetSignal={resetSignal}
               />
+              <div className="viewer-title">
+                <h1>Ping-Pong Keep-Up with Reinforcement Learning</h1>
+                <p>MuJoCo WebAssembly viewer for the Panda racket keep-up scene.</p>
+              </div>
+              <div className="runtime-status">
+                <span className={snapshot.mujocoLoaded ? "status-dot ready" : "status-dot"} />
+                <span>{snapshot.mujocoLoaded ? "MuJoCo WASM" : status}</span>
+              </div>
               {visualization.heightLabel ? (
                 <div className="height-readout">
                   <span>Ball height: {snapshot.ball.position[2].toFixed(2)}m</span>

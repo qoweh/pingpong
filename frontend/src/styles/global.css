@@ -48,9 +48,7 @@ button {
 
 .app-shell {
   min-height: 100vh;
-  background:
-    linear-gradient(180deg, rgba(255, 157, 27, 0.08), transparent 260px),
-    #111111;
+  background: #111111;
 }
 
 .app-header {
@@ -102,42 +100,52 @@ button {
 }
 
 .demo-band {
-  width: min(1480px, 100%);
+  width: 100%;
   margin: 0 auto;
-  padding: 28px;
+  padding: 0;
 }
 
-.demo-heading {
-  display: flex;
-  align-items: end;
-  justify-content: space-between;
-  gap: 24px;
-  margin-bottom: 18px;
+.viewer-title {
+  position: absolute;
+  top: 20px;
+  left: 24px;
+  z-index: 4;
+  max-width: min(560px, calc(100% - 420px));
+  color: #f7f7f7;
+  text-shadow: 0 1px 18px rgba(0, 0, 0, 0.65);
+  pointer-events: none;
 }
 
-h1 {
+.viewer-title h1 {
   margin: 0;
-  font-size: clamp(2rem, 4vw, 4.4rem);
-  line-height: 0.96;
+  font-size: clamp(1.08rem, 2vw, 1.7rem);
+  line-height: 1.05;
   letter-spacing: 0;
 }
 
-.demo-heading p {
-  max-width: 740px;
-  margin: 12px 0 0;
-  color: var(--muted);
-  font-size: 1.02rem;
-  line-height: 1.55;
+.viewer-title p {
+  margin: 7px 0 0;
+  color: rgba(255, 255, 255, 0.72);
+  font-size: 0.9rem;
+  line-height: 1.35;
 }
 
 .runtime-status {
+  position: absolute;
+  top: 22px;
+  right: 24px;
+  z-index: 5;
   display: flex;
   align-items: center;
   gap: 9px;
-  min-width: 190px;
-  color: #d8d8d8;
+  min-height: 30px;
+  padding: 0 10px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 7px;
+  background: rgba(17, 17, 17, 0.62);
+  color: #eeeeee;
   font-size: 0.92rem;
-  justify-content: flex-end;
+  backdrop-filter: blur(10px);
 }
 
 .status-dot {
@@ -152,18 +160,15 @@ h1 {
 }
 
 .demo-layout {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) 340px;
-  min-height: min(72vh, 780px);
-  border: 1px solid var(--line);
-  background: var(--surface);
+  position: relative;
+  min-height: calc(100vh - 64px);
+  background: #111111;
 }
 
 .viewer-pane {
   position: relative;
-  min-height: 560px;
+  min-height: calc(100vh - 64px);
   overflow: hidden;
-  border-right: 1px solid var(--line);
 }
 
 .simulation-canvas {
@@ -180,8 +185,9 @@ h1 {
 
 .height-readout {
   position: absolute;
-  right: 16px;
+  left: 24px;
   bottom: 16px;
+  z-index: 5;
   display: grid;
   gap: 4px;
   min-width: 180px;
@@ -194,11 +200,21 @@ h1 {
 }
 
 .control-pane {
+  position: absolute;
+  top: 70px;
+  right: 20px;
+  bottom: 20px;
+  z-index: 6;
   display: flex;
   flex-direction: column;
   gap: 18px;
+  width: 340px;
+  max-height: calc(100% - 90px);
   padding: 18px;
-  background: #181818;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 7px;
+  background: rgba(17, 17, 17, 0.78);
+  backdrop-filter: blur(14px);
   overflow: auto;
 }
 
@@ -326,7 +342,7 @@ select {
 .docs-band {
   width: min(1480px, 100%);
   margin: 0 auto;
-  padding: 0 28px 38px;
+  padding: 28px 28px 38px;
 }
 
 .docs-grid {
@@ -351,19 +367,22 @@ select {
 }
 
 @media (max-width: 1060px) {
-  .demo-layout {
-    grid-template-columns: 1fr;
-  }
-
   .viewer-pane {
     min-height: 58vh;
-    border-right: 0;
-    border-bottom: 1px solid var(--line);
   }
 
   .control-pane {
+    position: static;
     display: grid;
     grid-template-columns: repeat(2, minmax(0, 1fr));
+    width: auto;
+    max-height: none;
+    margin: 0;
+    border: 0;
+    border-top: 1px solid var(--line);
+    border-radius: 0;
+    background: #181818;
+    backdrop-filter: none;
   }
 
   .policy-note {
@@ -403,12 +422,17 @@ select {
     padding-right: 14px;
   }
 
-  .demo-heading {
-    display: grid;
+  .viewer-title {
+    max-width: calc(100% - 28px);
+    top: 16px;
+    left: 14px;
   }
 
   .runtime-status {
-    justify-content: start;
+    top: auto;
+    right: auto;
+    left: 14px;
+    bottom: 14px;
   }
 
   .viewer-pane {
