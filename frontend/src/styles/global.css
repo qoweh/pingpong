@@ -215,11 +215,24 @@ button {
   text-transform: uppercase;
 }
 
-.loading-panel h2 {
+.loading-heading {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.loading-heading h2 {
   margin: 0;
   color: #f6f6f6;
   font-size: 1.15rem;
   line-height: 1.2;
+}
+
+.loading-heading strong {
+  color: #ffffff;
+  font-size: 1.05rem;
+  letter-spacing: 0;
 }
 
 .loading-bar {
@@ -233,10 +246,10 @@ button {
 .loading-bar span {
   position: absolute;
   inset: 0 auto 0 0;
-  width: 42%;
+  width: 0;
   border-radius: inherit;
   background: linear-gradient(90deg, var(--accent), var(--accent-2));
-  animation: loading-slide 1.35s ease-in-out infinite;
+  transition: width 180ms ease;
 }
 
 .loading-steps {
@@ -249,18 +262,6 @@ button {
 
 .loading-steps .done {
   color: #e8fff8;
-}
-
-@keyframes loading-slide {
-  0% {
-    transform: translateX(-110%);
-  }
-  50% {
-    transform: translateX(70%);
-  }
-  100% {
-    transform: translateX(250%);
-  }
 }
 
 .control-shell {

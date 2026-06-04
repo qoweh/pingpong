@@ -7,6 +7,12 @@ export interface MujocoAssetManifest {
   sourceFiles?: string[];
 }
 
+export interface AssetLoadProgress {
+  loaded: number;
+  total: number;
+  file: string;
+}
+
 const ASSET_FETCH_CONCURRENCY = 8;
 
 export async function loadAssetManifest(): Promise<MujocoAssetManifest> {
@@ -21,15 +27,20 @@ export async function loadAssetManifest(): Promise<MujocoAssetManifest> {
 export async function loadMujocoAssets(
   files: string[],
   modelRoot: string,
-  onAsset: (file: string, bytes: Uint8Array) => void
+  onAsset: (file: string, bytes: Uint8Array) => void,
+  onProgress?: (progress: AssetLoadProgress) => void
 ): Promise<void> {
   let nextIndex = 0;
+  let completed = 0;
+  const total = files.length;
   const workers = Array.from({ length: Math.min(ASSET_FETCH_CONCURRENCY, files.length) }, async () => {
     while (nextIndex < files.length) {
       const file = files[nextIndex];
       nextIndex += 1;
       const bytes = await fetchAssetBytes(`${modelRoot}/${file}`);
       onAsset(file, bytes);
+      completed += 1;
+      onProgress?.({ loaded: completed, total, file });
     }
   });
 

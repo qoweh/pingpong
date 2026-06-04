@@ -54,6 +54,11 @@ export interface SimulationSnapshot {
   policyMessage: string;
 }
 
+export interface LoadingProgress {
+  percent: number;
+  message: string;
+}
+
 export interface DemoConfig {
   targetHeight: number;
   heightTolerance: number;

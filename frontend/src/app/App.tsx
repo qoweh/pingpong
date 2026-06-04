@@ -9,6 +9,7 @@ import { DocsPage } from "./DocsPage";
 import type {
   BallSpawnSettings,
   CameraMode,
+  LoadingProgress,
   PlaybackState,
   SimulationSnapshot,
   VisualizationSettings
@@ -16,6 +17,10 @@ import type {
 import { DEFAULT_BALL_SPAWN, DEFAULT_VISUALIZATION, ZERO_SNAPSHOT } from "../simulation/types";
 
 const GITHUB_URL = "https://github.com/qoweh/pingpong";
+const INITIAL_LOADING_PROGRESS: LoadingProgress = {
+  percent: 0,
+  message: "Starting simulation"
+};
 const SimulationCanvas = lazy(() =>
   import("../components/SimulationCanvas").then((module) => ({ default: module.SimulationCanvas }))
 );
@@ -28,6 +33,7 @@ export function App() {
   const [ballSpawn, setBallSpawn] = useState<BallSpawnSettings>(DEFAULT_BALL_SPAWN);
   const [snapshot, setSnapshot] = useState<SimulationSnapshot>(ZERO_SNAPSHOT);
   const [status, setStatus] = useState("Preparing simulation");
+  const [loadingProgress, setLoadingProgress] = useState<LoadingProgress>(INITIAL_LOADING_PROGRESS);
   const [resetSignal, setResetSignal] = useState(0);
   const [ballSpawnSignal, setBallSpawnSignal] = useState(0);
   const [controlsOpen, setControlsOpen] = useState(true);
@@ -46,6 +52,14 @@ export function App() {
     setPlayback("paused");
     setBallSpawn(value);
     setBallSpawnSignal((signal) => signal + 1);
+  }, []);
+
+  const updateStatus = useCallback((message: string) => {
+    setStatus(message);
+  }, []);
+
+  const updateLoadingProgress = useCallback((progress: LoadingProgress) => {
+    setLoadingProgress(progress);
   }, []);
 
   return (
@@ -78,7 +92,8 @@ export function App() {
                     visualization={visualization}
                     ballSpawn={ballSpawn}
                     onSnapshot={setSnapshot}
-                    onStatus={setStatus}
+                    onStatus={updateStatus}
+                    onProgress={updateLoadingProgress}
                     resetSignal={resetSignal}
                     ballSpawnSignal={ballSpawnSignal}
                   />
@@ -91,7 +106,7 @@ export function App() {
                   <span className={ready ? "status-dot ready" : "status-dot"} />
                   <span>{ready ? "Simulation Ready" : snapshot.mujocoLoaded ? snapshot.policyMessage : status}</span>
                 </div>
-                {!ready ? <LoadingOverlay status={status} snapshot={snapshot} /> : null}
+                {!ready ? <LoadingOverlay status={status} snapshot={snapshot} progress={loadingProgress} /> : null}
               </section>
 
               <div className={controlsOpen ? "control-shell open" : "control-shell closed"}>
@@ -144,18 +159,38 @@ export function App() {
   );
 }
 
-function LoadingOverlay({ status, snapshot }: { status: string; snapshot: SimulationSnapshot }) {
+function LoadingOverlay({
+  status,
+  snapshot,
+  progress
+}: {
+  status: string;
+  snapshot: SimulationSnapshot;
+  progress: LoadingProgress;
+}) {
+  const percent = Math.min(100, Math.max(0, Math.round(progress.percent)));
+  const message = progress.message || status;
   return (
     <div className="loading-overlay" role="status" aria-live="polite">
       <div className="loading-panel">
         <span className="loading-kicker">Starting simulation</span>
-        <h2>Preparing the scene</h2>
-        <div className="loading-bar">
-          <span />
+        <div className="loading-heading">
+          <h2>Preparing the scene</h2>
+          <strong>{percent}%</strong>
+        </div>
+        <div
+          className="loading-bar"
+          role="progressbar"
+          aria-label="Simulation loading progress"
+          aria-valuemin={0}
+          aria-valuemax={100}
+          aria-valuenow={percent}
+        >
+          <span style={{ width: `${percent}%` }} />
         </div>
         <div className="loading-steps">
           <span className={snapshot.mujocoLoaded ? "done" : ""}>
-            {snapshot.mujocoLoaded ? "3D scene ready" : status}
+            {snapshot.mujocoLoaded ? "3D scene ready" : message}
           </span>
           <span className={snapshot.policyLoaded ? "done" : ""}>{snapshot.policyMessage}</span>
           <span>First uncached load can take several seconds on a server.</span>

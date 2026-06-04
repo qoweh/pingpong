@@ -3,6 +3,7 @@ import type {
   BallSpawnSettings,
   CameraMode,
   DemoConfig,
+  LoadingProgress,
   PlaybackState,
   SimulationSnapshot,
   VisualizationSettings
@@ -12,6 +13,7 @@ import { ThreeScene } from "../visualization/ThreeScene";
 
 type SnapshotListener = (snapshot: SimulationSnapshot) => void;
 type StatusListener = (message: string) => void;
+type ProgressListener = (progress: LoadingProgress) => void;
 
 export class DemoController {
   private readonly world = new MujocoWorld();
@@ -24,29 +26,33 @@ export class DemoController {
   private previousTimestamp = 0;
   private snapshot: SimulationSnapshot = ZERO_SNAPSHOT;
   private lastSnapshotEmit = 0;
+  private readyProgressSent = false;
+  private loadPercent = 0;
 
   constructor(
     host: HTMLElement,
     private readonly onSnapshot: SnapshotListener,
-    private readonly onStatus: StatusListener
+    private readonly onStatus: StatusListener,
+    private readonly onProgress: ProgressListener
   ) {
     this.renderer = new ThreeScene(host);
     window.addEventListener("resize", this.resize);
   }
 
   async initialize(): Promise<void> {
-    this.onStatus("Preparing 3D scene");
+    this.reportProgress(0, "Starting simulation");
 
     try {
-      await this.world.initialize();
+      await this.world.initialize((progress) => this.reportProgress(progress.percent, progress.message));
       this.snapshot = this.world.reset();
       this.world.setPlayback(this.playback);
+      this.reportProgress(90, "Preparing viewer");
       this.renderer.loadWorld(this.world);
-      this.onStatus("3D scene ready");
+      this.reportProgress(94, "Waiting for control model");
       this.emit(true);
       this.loop(0);
     } catch (error) {
-      this.onStatus(error instanceof Error ? error.message : "Simulation failed to load");
+      this.reportProgress(100, error instanceof Error ? error.message : "Simulation failed to load");
       this.snapshot = ZERO_SNAPSHOT;
       this.emit(true);
     }
@@ -99,6 +105,11 @@ export class DemoController {
   };
 
   private emit(force = false): void {
+    if (this.snapshot.mujocoLoaded && this.snapshot.policyLoaded && !this.readyProgressSent) {
+      this.readyProgressSent = true;
+      this.reportProgress(100, "Simulation ready");
+    }
+
     const now = performance.now();
     if (!force && now - this.lastSnapshotEmit < 100) {
       return;
@@ -106,5 +117,15 @@ export class DemoController {
 
     this.lastSnapshotEmit = now;
     this.onSnapshot(this.snapshot);
+  }
+
+  private reportProgress(percent: number, message: string): void {
+    this.loadPercent = percent <= 0 ? 0 : Math.max(this.loadPercent, percent);
+    const progress = {
+      percent: Math.round(Math.min(100, Math.max(0, this.loadPercent))),
+      message
+    };
+    this.onStatus(message);
+    this.onProgress(progress);
   }
 }

@@ -5,6 +5,7 @@ import { loadMujocoModule } from "./mujocoLoader";
 import type {
   BallSpawnSettings,
   ContactEvent,
+  LoadingProgress,
   PlaybackState,
   SimulationSnapshot,
   Vec3
@@ -59,6 +60,8 @@ type LiveMessage =
       config: Record<string, unknown>;
     };
 
+type LoadingProgressListener = (progress: LoadingProgress) => void;
+
 export class MujocoWorld {
   private module: MainModule | null = null;
   private vfs: MjVFS | null = null;
@@ -86,23 +89,44 @@ export class MujocoWorld {
   private racketAnchor: Vec3 = [...ZERO_SNAPSHOT.racketPosition] as Vec3;
   private policyMessage = "Connecting to control model";
 
-  async initialize(): Promise<void> {
-    const [module, manifest] = await Promise.all([loadMujocoModule(), loadAssetManifest()]);
+  async initialize(onProgress?: LoadingProgressListener): Promise<void> {
+    notifyProgress(onProgress, 6, "Loading simulation engine");
+    const [module, manifest] = await Promise.all([
+      loadMujocoModule().then((loadedModule) => {
+        notifyProgress(onProgress, 34, "Simulation engine loaded");
+        return loadedModule;
+      }),
+      loadAssetManifest().then((loadedManifest) => {
+        notifyProgress(onProgress, 12, "Loading scene assets");
+        return loadedManifest;
+      })
+    ]);
 
     this.module = module;
     this.vfs = new module.MjVFS();
 
     const modelRoot = manifest.modelRoot || MODEL_ROOT;
 
+    notifyProgress(onProgress, 38, "Loading scene assets");
     this.ensureVirtualDirectory(MODEL_FS_ROOT);
-    await loadMujocoAssets(manifest.files, modelRoot, (file, bytes) => {
-      this.writeVirtualFile(`${MODEL_FS_ROOT}/${file}`, bytes);
-    });
+    await loadMujocoAssets(
+      manifest.files,
+      modelRoot,
+      (file, bytes) => {
+        this.writeVirtualFile(`${MODEL_FS_ROOT}/${file}`, bytes);
+      },
+      ({ loaded, total }) => {
+        const assetProgress = total > 0 ? loaded / total : 1;
+        notifyProgress(onProgress, 38 + assetProgress * 36, `Loading scene assets ${loaded}/${total}`);
+      }
+    );
 
+    notifyProgress(onProgress, 78, "Building simulation scene");
     this.model = this.loadModel(module, `${MODEL_FS_ROOT}/${manifest.scene}`, manifest.sceneFormat);
     this.data = new module.MjData(this.model);
     this.ids = this.resolveIds(module, this.model);
     this.resetLocalState();
+    notifyProgress(onProgress, 86, "Connecting control model");
     this.connectLiveBackend();
   }
 
@@ -503,4 +527,12 @@ function copyBuffer(target: ArrayLike<number>, source: ArrayLike<number>, length
   for (let index = 0; index < length; index += 1) {
     writable[index] = Number(source[index] ?? 0);
   }
+}
+
+function notifyProgress(listener: LoadingProgressListener | undefined, percent: number, message: string): void {
+  listener?.({ percent: clampProgress(percent), message });
+}
+
+function clampProgress(percent: number): number {
+  return Math.min(100, Math.max(0, percent));
 }

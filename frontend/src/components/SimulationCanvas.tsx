@@ -4,6 +4,7 @@ import { DemoController } from "../simulation/demoController";
 import type {
   BallSpawnSettings,
   CameraMode,
+  LoadingProgress,
   PlaybackState,
   SimulationSnapshot,
   VisualizationSettings
@@ -16,6 +17,7 @@ interface SimulationCanvasProps {
   ballSpawn: BallSpawnSettings;
   onSnapshot: (snapshot: SimulationSnapshot) => void;
   onStatus: (message: string) => void;
+  onProgress: (progress: LoadingProgress) => void;
   resetSignal: number;
   ballSpawnSignal: number;
 }
@@ -27,6 +29,7 @@ export function SimulationCanvas({
   ballSpawn,
   onSnapshot,
   onStatus,
+  onProgress,
   resetSignal,
   ballSpawnSignal
 }: SimulationCanvasProps) {
@@ -38,7 +41,7 @@ export function SimulationCanvas({
       return;
     }
 
-    const controller = new DemoController(hostRef.current, onSnapshot, onStatus);
+    const controller = new DemoController(hostRef.current, onSnapshot, onStatus, onProgress);
     controllerRef.current = controller;
     void controller.initialize();
 
@@ -46,7 +49,7 @@ export function SimulationCanvas({
       controller.dispose();
       controllerRef.current = null;
     };
-  }, [onSnapshot, onStatus]);
+  }, [onSnapshot, onStatus, onProgress]);
 
   useEffect(() => {
     controllerRef.current?.setPlayback(playback);
