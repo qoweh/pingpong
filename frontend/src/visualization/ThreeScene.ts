@@ -7,6 +7,7 @@ import { MujocoModelScene, mujocoToThree } from "./mujocoModelScene";
 
 const CONTACT_MARKER_TTL = 0.45;
 const TRAIL_MAX_POINTS = 180;
+const CAMERA_DEBUG_ENABLED = false;
 
 type ContactMarker = {
   mesh: THREE.Mesh;
@@ -20,7 +21,7 @@ export class ThreeScene {
   private readonly controls: OrbitControls;
   private readonly targetBand: THREE.Mesh;
   private readonly trailLine: THREE.Line;
-  private readonly cameraDebug: HTMLPreElement;
+  private readonly cameraDebug: HTMLPreElement | null = null;
   private readonly trailPositions = new Float32Array(TRAIL_MAX_POINTS * 3);
   private readonly markers: ContactMarker[] = [];
   private modelScene: MujocoModelScene | null = null;
@@ -43,9 +44,11 @@ export class ThreeScene {
     this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
     this.renderer.outputColorSpace = THREE.SRGBColorSpace;
     this.host.appendChild(this.renderer.domElement);
-    this.host.style.position = "relative";
-    this.cameraDebug = createCameraDebugElement();
-    this.host.appendChild(this.cameraDebug);
+    if (CAMERA_DEBUG_ENABLED) {
+      this.host.style.position = "relative";
+      this.cameraDebug = createCameraDebugElement();
+      this.host.appendChild(this.cameraDebug);
+    }
 
     const target = mujocoToThree([0.45, 0, 0.72]);
     this.cameras = {
@@ -130,7 +133,7 @@ export class ThreeScene {
     (this.trailLine.material as THREE.Material).dispose();
     this.controls.dispose();
     this.renderer.dispose();
-    this.cameraDebug.remove();
+    this.cameraDebug?.remove();
     this.host.removeChild(this.renderer.domElement);
   }
 
@@ -175,7 +178,9 @@ export class ThreeScene {
       if (mode === "free") {
         this.controls.update();
       }
-      this.updateCameraDebug(mode);
+      if (CAMERA_DEBUG_ENABLED) {
+        this.updateCameraDebug(mode);
+      }
 
       this.renderer.setViewport(0, 0, this.width, this.height);
       this.renderer.render(this.scene, this.cameras[mode]);
@@ -183,7 +188,9 @@ export class ThreeScene {
     }
 
     this.controls.enabled = false;
-    this.updateCameraDebug(mode);
+    if (CAMERA_DEBUG_ENABLED) {
+      this.updateCameraDebug(mode);
+    }
     this.renderer.setScissorTest(true);
     const views: Array<[Exclude<CameraMode, "free" | "top" | "four">, number, number]> = [
       ["north", 0, 1],
@@ -206,6 +213,10 @@ export class ThreeScene {
   }
 
   private updateCameraDebug(mode: CameraMode): void {
+    if (!this.cameraDebug) {
+      return;
+    }
+
     if (mode !== "free") {
       this.cameraDebug.style.display = "none";
       return;
