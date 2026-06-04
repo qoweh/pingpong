@@ -20,6 +20,7 @@ export class ThreeScene {
   private readonly controls: OrbitControls;
   private readonly targetBand: THREE.Mesh;
   private readonly trailLine: THREE.Line;
+  private readonly cameraDebug: HTMLPreElement;
   private readonly trailPositions = new Float32Array(TRAIL_MAX_POINTS * 3);
   private readonly markers: ContactMarker[] = [];
   private modelScene: MujocoModelScene | null = null;
@@ -42,6 +43,9 @@ export class ThreeScene {
     this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
     this.renderer.outputColorSpace = THREE.SRGBColorSpace;
     this.host.appendChild(this.renderer.domElement);
+    this.host.style.position = "relative";
+    this.cameraDebug = createCameraDebugElement();
+    this.host.appendChild(this.cameraDebug);
 
     const target = mujocoToThree([0.45, 0, 0.72]);
     this.cameras = {
@@ -126,6 +130,7 @@ export class ThreeScene {
     (this.trailLine.material as THREE.Material).dispose();
     this.controls.dispose();
     this.renderer.dispose();
+    this.cameraDebug.remove();
     this.host.removeChild(this.renderer.domElement);
   }
 
@@ -170,6 +175,7 @@ export class ThreeScene {
       if (mode === "free") {
         this.controls.update();
       }
+      this.updateCameraDebug(mode);
 
       this.renderer.setViewport(0, 0, this.width, this.height);
       this.renderer.render(this.scene, this.cameras[mode]);
@@ -177,6 +183,7 @@ export class ThreeScene {
     }
 
     this.controls.enabled = false;
+    this.updateCameraDebug(mode);
     this.renderer.setScissorTest(true);
     const views: Array<[Exclude<CameraMode, "free" | "top" | "four">, number, number]> = [
       ["north", 0, 1],
@@ -196,6 +203,26 @@ export class ThreeScene {
     }
 
     this.renderer.setScissorTest(false);
+  }
+
+  private updateCameraDebug(mode: CameraMode): void {
+    if (mode !== "free") {
+      this.cameraDebug.style.display = "none";
+      return;
+    }
+
+    const camera = this.cameras.free as THREE.PerspectiveCamera;
+    const cameraPosition = threeToMujoco(camera.position);
+    const targetPosition = threeToMujoco(this.controls.target);
+    this.cameraDebug.style.display = "block";
+    this.cameraDebug.textContent = [
+      "TEMP FREE VIEW CAMERA",
+      `camera: [${formatVec3(cameraPosition)}]`,
+      `target:  [${formatVec3(targetPosition)}]`,
+      `fov:     ${formatNumber(camera.fov)}`,
+      "",
+      `free: perspectiveCamera(mujocoToThree([${formatVec3(cameraPosition)}]), target, ${formatNumber(camera.fov)})`
+    ].join("\n");
   }
 
   private updateTrail(snapshot: SimulationSnapshot, visible: boolean): void {
@@ -306,6 +333,25 @@ function createTrailGeometry(positions: Float32Array): THREE.BufferGeometry {
   return geometry;
 }
 
+function createCameraDebugElement(): HTMLPreElement {
+  const element = document.createElement("pre");
+  element.style.position = "absolute";
+  element.style.left = "16px";
+  element.style.bottom = "16px";
+  element.style.zIndex = "6";
+  element.style.margin = "0";
+  element.style.padding = "10px 12px";
+  element.style.border = "1px solid rgba(255, 255, 255, 0.16)";
+  element.style.borderRadius = "7px";
+  element.style.background = "rgba(17, 17, 17, 0.74)";
+  element.style.color = "#f2f2f2";
+  element.style.font = "12px/1.45 ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace";
+  element.style.pointerEvents = "none";
+  element.style.whiteSpace = "pre-wrap";
+  element.style.backdropFilter = "blur(10px)";
+  return element;
+}
+
 function perspectiveCamera(position: THREE.Vector3, target: THREE.Vector3, fov = 45): THREE.PerspectiveCamera {
   const camera = new THREE.PerspectiveCamera(fov, 1, 0.001, 100);
   camera.position.copy(position);
@@ -319,4 +365,16 @@ function orthographicCamera(position: THREE.Vector3, target: THREE.Vector3): THR
   camera.up.set(0, 0, -1);
   camera.lookAt(target);
   return camera;
+}
+
+function threeToMujoco(position: THREE.Vector3): [number, number, number] {
+  return [position.x, -position.z, position.y];
+}
+
+function formatVec3(values: [number, number, number]): string {
+  return values.map(formatNumber).join(", ");
+}
+
+function formatNumber(value: number): string {
+  return value.toFixed(3).replace(/\.?0+$/, "");
 }
