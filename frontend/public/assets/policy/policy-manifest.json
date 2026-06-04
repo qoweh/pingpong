@@ -1,0 +1,9 @@
+{
+  "format": "sb3-zip",
+  "name": "pmk_cf_self_rally_v28_robot_base_disk",
+  "file": "/assets/policy/pmk_cf_self_rally_v28_robot_base_disk_model.zip",
+  "sourceModel": "rl/artifacts/pmk_cf_self_rally_v28_robot_base_disk/pmk_cf_self_rally_v28_robot_base_disk_model.zip",
+  "observationSize": 55,
+  "actionSize": 15,
+  "message": "Final PPO source model is bundled. Browser ONNX/JSON export is the next integration step."
+}
