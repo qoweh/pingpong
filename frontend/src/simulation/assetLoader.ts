@@ -2,9 +2,12 @@ export interface MujocoAssetManifest {
   modelRoot: string;
   scene: string;
   files: string[];
+  sceneFormat?: "xml" | "mjb";
+  sourceScene?: string;
+  sourceFiles?: string[];
 }
 
-const ASSET_CACHE_NAME = "pingpong-mujoco-assets-v3";
+const ASSET_CACHE_NAME = "pingpong-mujoco-assets-v4";
 const ASSET_FETCH_CONCURRENCY = 8;
 
 export async function loadAssetManifest(): Promise<MujocoAssetManifest> {

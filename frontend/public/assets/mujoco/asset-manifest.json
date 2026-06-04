@@ -1,7 +1,12 @@
 {
   "modelRoot": "/assets/mujoco",
-  "scene": "scene.xml",
+  "scene": "pingpong_scene.mjb",
   "files": [
+    "pingpong_scene.mjb"
+  ],
+  "sceneFormat": "mjb",
+  "sourceScene": "scene.xml",
+  "sourceFiles": [
     "franka/assets/finger_0.obj",
     "franka/assets/finger_1.obj",
     "franka/assets/hand.stl",

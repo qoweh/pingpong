@@ -69,6 +69,7 @@ const TARGET_OFFSET_LOW_Z = -0.04;
 const TARGET_OFFSET_HIGH_Z = 0.12;
 const TARGET_TILT_LIMIT: [number, number] = [0.12, 0.12];
 const MIN_DESIRED_APEX_HEIGHT_DELTA = 0.01;
+const CONTACT_EVENT_COOLDOWN = 0.08;
 
 type MujocoIds = {
   ballBody: number;
@@ -142,11 +143,13 @@ export class MujocoWorld {
     this.module = module;
     this.vfs = new module.MjVFS();
 
-    await loadMujocoAssets(manifest.files, MODEL_ROOT, (file, bytes) => {
+    const modelRoot = manifest.modelRoot || MODEL_ROOT;
+
+    await loadMujocoAssets(manifest.files, modelRoot, (file, bytes) => {
       this.vfs?.addBuffer(file, bytes);
     });
 
-    this.model = module.MjModel.from_xml_path(manifest.scene, this.vfs);
+    this.model = this.loadModel(module, manifest.scene, manifest.sceneFormat);
     this.data = new module.MjData(this.model);
     this.ids = this.resolveIds(module, this.model);
     this.homeCtrl = Array.from(this.model.key_ctrl ?? [])
@@ -267,6 +270,15 @@ export class MujocoWorld {
       position: arrayVec3(this.data.geom_xpos, geomId * 3),
       matrix: Array.from(this.data.geom_xmat.slice(geomId * 9, geomId * 9 + 9))
     };
+  }
+
+  private loadModel(module: MainModule, scene: string, sceneFormat?: "xml" | "mjb"): MjModel {
+    if (!this.vfs) {
+      throw new Error("MuJoCo virtual file system is not initialized.");
+    }
+
+    const format = sceneFormat ?? (scene.endsWith(".mjb") ? "mjb" : "xml");
+    return format === "mjb" ? module.MjModel.from_binary_path(scene, this.vfs) : module.MjModel.from_xml_path(scene, this.vfs);
   }
 
   getBodyPosition(name: string): Vec3 | null {
@@ -888,7 +900,10 @@ export class MujocoWorld {
 
         if (this.isBallRacketContact(contact.geom1, contact.geom2)) {
           racket = true;
-          if (!this.contactActive) {
+          if (
+            !this.contactActive &&
+            (!this.lastContact || this.data.time - this.lastContact.time >= CONTACT_EVENT_COOLDOWN)
+          ) {
             this.contactCount += 1;
             this.lastContact = {
               position: arrayVec3(contact.pos, 0),

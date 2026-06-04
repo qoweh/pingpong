@@ -42,7 +42,7 @@ export function App() {
           <span>Ping-Pong Keep-Up RL</span>
         </a>
         <nav className="nav-links" aria-label="Primary navigation">
-          <a href="/docs">Docs</a>
+          {isDocsPage ? null : <a href="/docs">Docs</a>}
           <a href={GITHUB_URL} target="_blank" rel="noreferrer">
             <ExternalLink size={17} />
             <span>GitHub</span>
