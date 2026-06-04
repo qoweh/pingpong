@@ -27,6 +27,7 @@ export function App() {
   const [snapshot, setSnapshot] = useState<SimulationSnapshot>(ZERO_SNAPSHOT);
   const [status, setStatus] = useState("Loading");
   const [resetSignal, setResetSignal] = useState(0);
+  const ballHeightAboveRacket = snapshot.ball.position[2] - snapshot.racketPosition[2];
 
   const reset = useCallback(() => {
     setPlayback("paused");
@@ -75,10 +76,10 @@ export function App() {
               </div>
               {visualization.heightLabel ? (
                 <div className="height-readout">
-                  <span>Ball height: {snapshot.ball.position[2].toFixed(2)}m</span>
+                  <span>Ball height: {ballHeightAboveRacket.toFixed(2)}m</span>
                   <span>Target: {DEFAULT_DEMO_CONFIG.targetHeight.toFixed(2)}m</span>
                   <span>
-                    Error: {(snapshot.ball.position[2] - DEFAULT_DEMO_CONFIG.targetHeight).toFixed(2)}m
+                    Error: {(ballHeightAboveRacket - DEFAULT_DEMO_CONFIG.targetHeight).toFixed(2)}m
                   </span>
                 </div>
               ) : null}
@@ -90,7 +91,7 @@ export function App() {
               <div className="metrics-grid">
                 <div>
                   <span>Height</span>
-                  <strong>{snapshot.ball.position[2].toFixed(2)}m</strong>
+                  <strong>{ballHeightAboveRacket.toFixed(2)}m</strong>
                 </div>
                 <div>
                   <span>Contacts</span>

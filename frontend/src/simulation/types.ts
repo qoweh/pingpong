@@ -62,7 +62,7 @@ export const DEFAULT_DEMO_CONFIG: DemoConfig = {
 export const ZERO_SNAPSHOT: SimulationSnapshot = {
   time: 0,
   ball: {
-    position: DEFAULT_DEMO_CONFIG.ballPosition,
+    position: [0.35, 0, 1.06],
     velocity: [0, 0, 0]
   },
   racketPosition: [0.35, 0, 0.72],
