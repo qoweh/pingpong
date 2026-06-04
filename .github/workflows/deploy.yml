@@ -12,6 +12,9 @@ jobs:
     steps:
       - name: Deploy
         run: |
-          cd "${{ vars.SERVER_PROJECT_PATH }}"
-          git pull
-          docker compose up -d --build --force-recreate
+            cd /home/minwoo/pingpong
+
+            git fetch origin
+            git reset --hard origin/main
+
+            docker compose up -d --build --force-recreate
