@@ -5,17 +5,27 @@ RUN npm install
 COPY frontend ./
 RUN npm run build
 
-FROM gradle:8.14.3-jdk17 AS backend-build
-WORKDIR /workspace/backend
-COPY backend/settings.gradle backend/build.gradle ./
-COPY backend/src ./src
-COPY --from=frontend-build /workspace/frontend/dist ./src/main/resources/static
-RUN gradle --no-daemon bootJar
-
-FROM eclipse-temurin:17-jre-jammy
+FROM python:3.11-slim
 WORKDIR /app
+
+ENV PYTHONUNBUFFERED=1
+ENV PINGPONG_PROJECT_ROOT=/app
 ENV SERVER_PORT=8079
-ENV DEBUG=false
-COPY --from=backend-build /workspace/backend/build/libs/pingpong-web.jar /app/app.jar
+
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends \
+      libegl1 \
+      libgl1 \
+      libglib2.0-0 \
+      libosmesa6 \
+    && rm -rf /var/lib/apt/lists/*
+
+COPY backend/requirements.txt /tmp/requirements.txt
+RUN pip install --no-cache-dir -r /tmp/requirements.txt
+
+COPY backend ./backend
+COPY rl ./rl
+COPY --from=frontend-build /workspace/frontend/dist ./frontend/dist
+
 EXPOSE 8079
-ENTRYPOINT ["java", "-jar", "/app/app.jar"]
+CMD ["sh", "-c", "python -m uvicorn backend.app.main:app --host 0.0.0.0 --port ${SERVER_PORT:-8079}"]

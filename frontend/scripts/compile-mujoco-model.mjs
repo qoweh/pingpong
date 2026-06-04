@@ -9,7 +9,7 @@ const frontendRoot = path.resolve(__dirname, "..");
 const assetRoot = path.join(frontendRoot, "public", "assets", "mujoco");
 const manifestPath = path.join(assetRoot, "asset-manifest.json");
 const outputScene = "pingpong_scene.mjb";
-const defaultSourceRoot = "/Users/pilt/project-collection/ros2/graduation-prj/pingpong_rl2/assets";
+const defaultSourceRoot = path.join(frontendRoot, "..", "rl", "assets");
 const sourceRoot = path.resolve(process.env.PINGPONG_MUJOCO_SOURCE_ROOT ?? defaultSourceRoot);
 const sourceScene = process.env.PINGPONG_MUJOCO_SOURCE_SCENE ?? "scene.xml";
 

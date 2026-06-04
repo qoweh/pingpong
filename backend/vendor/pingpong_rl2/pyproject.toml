@@ -1,0 +1,21 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "pingpong-rl2"
+version = "0.1.0"
+description = "Minimal MuJoCo ping pong keep-up baseline"
+requires-python = ">=3.10"
+dependencies = [
+    "gymnasium",
+    "mujoco",
+    "numpy",
+    "stable-baselines3",
+]
+
+[tool.setuptools]
+package-dir = {"" = "src"}
+
+[tool.setuptools.packages.find]
+where = ["src"]

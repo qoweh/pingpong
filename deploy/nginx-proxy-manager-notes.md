@@ -10,6 +10,6 @@ Forward Port: 8079
 
 Recommended settings:
 
-- Websockets are not required for the MVP.
+- Enable Websockets. The live RL state stream uses `/api/live`.
 - Cache can remain off while assets are changing.
 - SSL can be managed by Nginx Proxy Manager.

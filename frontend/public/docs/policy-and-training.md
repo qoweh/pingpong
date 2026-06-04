@@ -6,18 +6,6 @@ Current source model:
 PINGPONG_POLICY_MODEL_PATH=rl/artifacts/pmk_cf_self_rally_v25/pmk_cf_self_rally_v25_model.zip
 ```
 
-Browser replay artifact:
-
-```text
-frontend/public/assets/demo/rollout.json
-```
-
-Export command:
-
-```text
-conda run -n mujoco_env python scripts/export_web_rollout_from_env.py
-```
-
 Training summary:
 
 | Setting | Value |
@@ -35,8 +23,8 @@ Training summary:
 | Device | auto |
 | Action mode | position_contact_frame_velocity_tilt_lateral_apex_residual |
 
-Browser policy status:
+Runtime policy status:
 
-The browser does not run a hand-ported TypeScript copy of the Python Gym environment or PPO policy. The export script imports the original `pingpong_rl2` Python package, loads `PINGPONG_POLICY_MODEL_PATH`, runs the original env/model/policy, and writes the resulting initial MuJoCo state, low-level actuator `ctrl` frames, action metadata, contact info, env config, and reset info to `rollout.json`.
+The Python backend imports the vendored `pingpong_rl2` source, loads `PINGPONG_POLICY_MODEL_PATH`, creates the original `PingPongKeepUpGymEnv`, and calls the Stable-Baselines3 PPO policy on every environment step.
 
-The browser then loads the same compiled MuJoCo scene with WASM and replays the exported control frames with `mj_step`. To switch models, update `PINGPONG_POLICY_MODEL_PATH` and rerun the export command.
+The browser receives live qpos/qvel/ctrl/contact frames over WebSocket and renders them with the compiled MuJoCo WASM scene.

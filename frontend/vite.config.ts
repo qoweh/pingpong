@@ -7,6 +7,13 @@ export default defineConfig({
   server: {
     fs: {
       strict: true
+    },
+    proxy: {
+      "/api": {
+        target: "http://localhost:8079",
+        changeOrigin: true,
+        ws: true
+      }
     }
   }
 });

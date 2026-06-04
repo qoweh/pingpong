@@ -69,5 +69,5 @@ export const ZERO_SNAPSHOT: SimulationSnapshot = {
   lastContact: null,
   mujocoLoaded: false,
   policyLoaded: false,
-  policyMessage: "Loading MuJoCo WASM"
+  policyMessage: "Connecting to Python live backend"
 };

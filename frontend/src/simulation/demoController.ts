@@ -42,6 +42,7 @@ export class DemoController {
       await this.world.initialize(this.config);
       this.initialized = true;
       this.snapshot = this.world.reset();
+      this.world.setPlayback(this.playback);
       this.renderer.loadWorld(this.world);
       this.onStatus("MuJoCo WASM loaded");
       this.emit(true);
@@ -62,6 +63,7 @@ export class DemoController {
 
   setPlayback(playback: PlaybackState): void {
     this.playback = playback;
+    this.world.setPlayback(playback);
   }
 
   setCameraMode(cameraMode: CameraMode): void {
@@ -85,10 +87,8 @@ export class DemoController {
     const elapsed = this.previousTimestamp ? Math.min((timestamp - this.previousTimestamp) / 1000, 0.05) : 0;
     this.previousTimestamp = timestamp;
 
-    if (this.playback === "playing" || !this.initialized) {
-      this.snapshot = this.world.step(elapsed || 1 / 60);
-      this.emit();
-    }
+    this.snapshot = this.world.step(elapsed || 1 / 60);
+    this.emit();
 
     this.renderer.update(this.snapshot, this.world, this.visualization, this.config);
     this.renderer.render(this.cameraMode);

@@ -24,4 +24,4 @@ If the image is built on the M1 MacBook and then moved to the server, build it w
 DOCKER_DEFAULT_PLATFORM=linux/amd64 docker compose build
 ```
 
-For local-only MacBook testing, Docker's default Apple Silicon image is fine because the app serves browser WASM and static assets from a Java container.
+For local-only MacBook testing, Docker's default Apple Silicon image is fine. For the ASUS home server, prefer building on the server or using `DOCKER_DEFAULT_PLATFORM=linux/amd64`.

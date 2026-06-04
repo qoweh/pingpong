@@ -2,32 +2,37 @@
 
 Development is done on an Apple Silicon MacBook. Deployment target is an ASUS Ubuntu home server with an Intel x86_64 CPU.
 
-The project avoids architecture-specific native build output in source control:
-
-- Frontend dependencies are installed inside the build environment.
-- Spring Boot runs on a Java 17 runtime image.
-- Docker images used by the Dockerfile are multi-architecture images.
-- The MuJoCo runtime in the browser uses WASM, not host-native MuJoCo binaries.
-
-Architecture note:
-
-- Building directly on the ASUS server produces a native `linux/amd64` image.
-- Building on the M1 MacBook for the ASUS server should use an explicit `linux/amd64` Docker platform.
-- Building on the M1 MacBook for local testing can use Docker's default Apple Silicon platform.
-
-Serving flow:
+Runtime stack:
 
 ```text
 frontend build
--> backend/src/main/resources/static
--> Spring Boot embedded Tomcat
+-> Python FastAPI/Uvicorn backend
+-> live pingpong_rl2 PPO simulation
 -> host port 8079
 -> Nginx Proxy Manager
 ```
 
-WASM serving notes:
+Architecture notes:
 
-- `.wasm` is served as `application/wasm`.
-- The MVP uses single-threaded `@mujoco/mujoco`.
-- `@mujoco/mujoco` is pinned to `3.8.0` to match the Python `mujoco_env` runtime used to export rollout traces.
-- Multi-threaded WASM is not enabled, so cross-origin isolation headers are not required for the MVP.
+- Build directly on the ASUS server for a native `linux/amd64` image.
+- If building on the M1 MacBook for the ASUS server, use `DOCKER_DEFAULT_PLATFORM=linux/amd64 docker compose build`.
+- The backend requires Python MuJoCo, Stable-Baselines3, and the selected PPO model artifact.
+- The browser still loads MuJoCo WASM and the compiled MJB scene for rendering.
+- `@mujoco/mujoco` is pinned to `3.8.0` to match the Python MuJoCo runtime.
+
+Required runtime data:
+
+```text
+backend/vendor/pingpong_rl2/src
+rl/assets/scene.xml
+rl/assets/franka/**
+rl/artifacts/<selected_model>/<selected_model>_model.zip
+rl/artifacts/<selected_model>/<selected_model>_training_summary.json
+frontend/public/assets/mujoco/pingpong_scene.mjb
+```
+
+Health check:
+
+```sh
+curl http://localhost:8079/api/health
+```

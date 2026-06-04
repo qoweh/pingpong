@@ -11,3 +11,7 @@ frontend/.vite/
 backend/build/
 backend/.gradle/
 backend/src/main/resources/static/*
+backend/**/__pycache__/
+backend/**/*.pyc
+.venv/
+*.egg-info/

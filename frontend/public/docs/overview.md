@@ -2,22 +2,26 @@
 
 Ping-Pong Keep-Up with Reinforcement Learning shows a Franka Panda robot arm with a ping-pong paddle keeping a ball in the air in a MuJoCo simulation.
 
-The browser demo runs the MuJoCo model with WebAssembly, renders the scene with Three.js, and exposes only the controls needed for the demo:
-
-- Playback
-- Camera mode
-- Visualization toggles
-
-System flow:
+Current runtime architecture:
 
 ```text
-PPO training artifacts
--> Python env/model rollout export
--> MuJoCo WASM simulation
--> Three.js rendering
--> Spring Boot static serving
+Python live backend
+-> original pingpong_rl2 Gym env
+-> Stable-Baselines3 PPO policy
+-> WebSocket qpos/qvel/ctrl/contact stream
+-> browser MuJoCo WASM model for rendering state
+-> Three.js viewer
 -> Nginx Proxy Manager
 ```
+
+The browser no longer runs a hand-ported TypeScript policy and no longer replays a precomputed rollout. The Python backend runs the original RL environment live and the frontend visualizes the latest MuJoCo state.
+
+Controls:
+
+- Playback
+- Reset
+- Camera mode
+- Visualization toggles
 
 Reference training repository:
 

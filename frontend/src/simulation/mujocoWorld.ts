@@ -2,8 +2,7 @@ import type { MainModule, MjData, MjModel, MjVFS } from "@mujoco/mujoco";
 
 import { loadMujocoAssets, loadAssetManifest } from "./assetLoader";
 import { loadMujocoModule } from "./mujocoLoader";
-import { loadRolloutTrace, type MujocoStateFrame, type RolloutFrame, type RolloutTrace } from "./rolloutTrace";
-import type { ContactEvent, DemoConfig, SimulationSnapshot, Vec3 } from "./types";
+import type { ContactEvent, DemoConfig, PlaybackState, SimulationSnapshot, Vec3 } from "./types";
 import { ZERO_SNAPSHOT } from "./types";
 
 const MODEL_ROOT = "/assets/mujoco";
@@ -11,7 +10,6 @@ const MODEL_FS_ROOT = "/pingpong_model";
 const BALL_BODY_NAME = "ball";
 const BALL_JOINT_NAME = "ball_joint";
 const RACKET_SITE_NAME = "racket_center";
-const MAX_TRACE_STEPS_PER_RENDER = 8;
 
 type MujocoIds = {
   ballBody: number;
@@ -19,34 +17,62 @@ type MujocoIds = {
   racketSite: number;
 };
 
+type LiveFrame = {
+  type: "frame";
+  episode: number;
+  step: number;
+  time: number;
+  terminated: boolean;
+  truncated: boolean;
+  policyLoaded: boolean;
+  policyMessage: string;
+  state: {
+    qpos: number[];
+    qvel: number[];
+    ctrl: number[];
+    time: number;
+  };
+  ball: {
+    position: Vec3;
+    velocity: Vec3;
+  };
+  racketPosition: Vec3;
+  contact: {
+    count: number;
+    last: ContactEvent | null;
+  };
+};
+
+type LiveMessage =
+  | LiveFrame
+  | {
+      type: "ready";
+      config: Record<string, unknown>;
+    };
+
 export class MujocoWorld {
   private module: MainModule | null = null;
   private vfs: MjVFS | null = null;
   private model: MjModel | null = null;
   private data: MjData | null = null;
   private ids: MujocoIds | null = null;
-  private trace: RolloutTrace | null = null;
-  private homeCtrl: number[] = [];
-  private frameIndex = 0;
-  private frameAccumulator = 0;
-  private traceEnded = false;
+  private socket: WebSocket | null = null;
+  private latestFrame: LiveFrame | null = null;
+  private liveReady = false;
+  private liveConnected = false;
+  private playback: PlaybackState = "paused";
   private contactCount = 0;
   private lastContact: ContactEvent | null = null;
   private fallbackTime = 0;
   private fallbackBallPosition: Vec3 = [...ZERO_SNAPSHOT.ball.position] as Vec3;
   private fallbackBallVelocity: Vec3 = [0, 0, 0];
   private racketAnchor: Vec3 = [...ZERO_SNAPSHOT.racketPosition] as Vec3;
-  private policyMessage = "Loading Python rollout trace";
+  private policyMessage = "Connecting to Python live backend";
 
   async initialize(_config: DemoConfig): Promise<void> {
-    const [module, manifest, trace] = await Promise.all([
-      loadMujocoModule(),
-      loadAssetManifest(),
-      loadRolloutTrace()
-    ]);
+    const [module, manifest] = await Promise.all([loadMujocoModule(), loadAssetManifest()]);
 
     this.module = module;
-    this.trace = trace;
     this.vfs = new module.MjVFS();
 
     const modelRoot = manifest.modelRoot || MODEL_ROOT;
@@ -59,25 +85,20 @@ export class MujocoWorld {
     this.model = this.loadModel(module, `${MODEL_FS_ROOT}/${manifest.scene}`, manifest.sceneFormat);
     this.data = new module.MjData(this.model);
     this.ids = this.resolveIds(module, this.model);
-    this.homeCtrl = Array.from(this.model.key_ctrl ?? [])
-      .slice(0, this.model.nu)
-      .map((value) => Number(value));
-    this.validateTraceModel();
-    this.policyMessage = this.trace
-      ? `Python rollout replay loaded: ${basename(this.trace.source.model)}`
-      : "Python rollout trace missing. Run scripts/export_web_rollout_from_env.py.";
-    this.reset();
+    this.resetLocalState();
+    this.connectLiveBackend();
   }
 
   dispose(): void {
+    this.socket?.close();
     this.data?.delete();
     this.model?.delete();
     this.vfs?.delete();
+    this.socket = null;
     this.data = null;
     this.model = null;
     this.vfs = null;
     this.ids = null;
-    this.trace = null;
   }
 
   getRuntime(): { module: MainModule; model: MjModel; data: MjData } | null {
@@ -93,56 +114,24 @@ export class MujocoWorld {
   }
 
   reset(): SimulationSnapshot {
-    if (!this.module || !this.model || !this.data || !this.ids) {
-      this.fallbackTime = 0;
-      this.fallbackBallPosition = [...ZERO_SNAPSHOT.ball.position] as Vec3;
-      this.fallbackBallVelocity = [0, 0, 0];
-      this.resetTracePlayback();
-      return this.fallbackSnapshot();
-    }
-
-    this.module.mj_resetData(this.model, this.data);
-    if (this.trace) {
-      this.applyMujocoState(this.trace.initialState);
-    } else {
-      this.applyHomeCtrl();
-    }
-    this.module.mj_forward(this.model, this.data);
-    this.racketAnchor = arrayVec3(this.data.site_xpos, this.ids.racketSite * 3);
-    this.resetTracePlayback();
+    this.resetLocalState();
+    this.sendCommand({ type: "reset" });
     return this.snapshot();
   }
 
-  step(elapsedSeconds: number): SimulationSnapshot {
+  setPlayback(playback: PlaybackState): void {
+    this.playback = playback;
+    this.sendCommand({ type: "playback", playback });
+  }
+
+  step(_elapsedSeconds: number): SimulationSnapshot {
     if (!this.module || !this.model || !this.data || !this.ids) {
-      return this.stepFallback(elapsedSeconds);
+      return this.stepFallback(1 / 60);
     }
 
-    if (!this.trace) {
-      return this.snapshot();
-    }
-
-    if (this.traceEnded) {
-      this.reset();
-    }
-
-    const controlDt = this.controlDt();
-    const elapsed = Number.isFinite(elapsedSeconds) ? Math.max(0, elapsedSeconds) : 0;
-    this.frameAccumulator += Math.min(elapsed, controlDt * MAX_TRACE_STEPS_PER_RENDER);
-
-    let steps = 0;
-    while (this.frameAccumulator >= controlDt && steps < MAX_TRACE_STEPS_PER_RENDER) {
-      this.frameAccumulator -= controlDt;
-      this.advanceTraceFrame();
-      steps += 1;
-
-      if (this.traceEnded) {
-        break;
-      }
-    }
-
-    if (steps >= MAX_TRACE_STEPS_PER_RENDER && this.frameAccumulator >= controlDt) {
-      this.frameAccumulator = 0;
+    if (this.latestFrame) {
+      this.applyLiveFrame(this.latestFrame);
+      this.latestFrame = null;
     }
 
     return this.snapshot();
@@ -177,112 +166,92 @@ export class MujocoWorld {
     return arrayVec3(this.data.xpos, bodyId * 3);
   }
 
-  private advanceTraceFrame(): void {
-    if (!this.module || !this.model || !this.data || !this.trace) {
+  private connectLiveBackend(): void {
+    this.socket?.close();
+    this.socket = new WebSocket(liveWebSocketUrl());
+
+    this.socket.addEventListener("open", () => {
+      this.liveConnected = true;
+      this.policyMessage = "Python live backend connected";
+      this.sendCommand({ type: "playback", playback: this.playback });
+    });
+
+    this.socket.addEventListener("message", (event) => {
+      const message = parseLiveMessage(event.data);
+      if (!message) {
+        return;
+      }
+
+      if (message.type === "ready") {
+        this.liveReady = true;
+        this.policyMessage = "Python live backend ready";
+        return;
+      }
+
+      this.latestFrame = message;
+      this.liveReady = true;
+      this.policyMessage = message.policyMessage;
+    });
+
+    this.socket.addEventListener("close", () => {
+      this.liveConnected = false;
+      this.liveReady = false;
+      this.policyMessage = "Python live backend disconnected";
+    });
+
+    this.socket.addEventListener("error", () => {
+      this.liveConnected = false;
+      this.policyMessage = "Python live backend connection failed";
+    });
+  }
+
+  private sendCommand(command: Record<string, unknown>): void {
+    if (!this.socket || this.socket.readyState !== WebSocket.OPEN) {
+      return;
+    }
+    this.socket.send(JSON.stringify(command));
+  }
+
+  private applyLiveFrame(frame: LiveFrame): void {
+    if (!this.module || !this.model || !this.data || !this.ids) {
       return;
     }
 
-    if (this.frameIndex >= this.trace.frames.length) {
-      this.traceEnded = true;
+    if (
+      frame.state.qpos.length !== this.model.nq ||
+      frame.state.qvel.length !== this.model.nv ||
+      frame.state.ctrl.length !== this.model.nu
+    ) {
+      this.policyMessage = "Python live frame does not match the loaded MuJoCo model.";
       return;
     }
 
-    const frame = this.trace.frames[this.frameIndex];
-    this.applyCtrl(frame.ctrl);
+    copyBuffer(this.data.qpos, frame.state.qpos, this.model.nq);
+    copyBuffer(this.data.qvel, frame.state.qvel, this.model.nv);
+    copyBuffer(this.data.ctrl, frame.state.ctrl, this.model.nu);
+    this.data.time = Number.isFinite(frame.state.time) ? frame.state.time : frame.time;
+    this.module.mj_forward(this.model, this.data);
 
-    const substeps = this.substepsPerFrame();
-    for (let index = 0; index < substeps; index += 1) {
-      this.module.mj_step(this.model, this.data);
-    }
-
-    this.applyFrameMetadata(frame);
-    this.frameIndex += 1;
-    this.traceEnded = frame.terminated || frame.truncated || this.frameIndex >= this.trace.frames.length;
+    this.contactCount = frame.contact.count;
+    this.lastContact = frame.contact.last;
+    this.racketAnchor = arrayVec3(this.data.site_xpos, this.ids.racketSite * 3);
   }
 
-  private applyFrameMetadata(frame: RolloutFrame): void {
-    this.contactCount = Math.max(this.contactCount, frame.contact.count);
-
-    if (frame.contact.event && frame.contact.position) {
-      this.lastContact = {
-        position: frame.contact.position,
-        time: frame.time
-      };
-    }
-  }
-
-  private applyMujocoState(state: MujocoStateFrame): void {
-    if (!this.model || !this.data) {
+  private resetLocalState(): void {
+    if (!this.module || !this.model || !this.data || !this.ids) {
+      this.fallbackTime = 0;
+      this.fallbackBallPosition = [...ZERO_SNAPSHOT.ball.position] as Vec3;
+      this.fallbackBallVelocity = [0, 0, 0];
+      this.contactCount = 0;
+      this.lastContact = null;
       return;
     }
 
-    copyBuffer(this.data.qpos, state.qpos, this.model.nq);
-    copyBuffer(this.data.qvel, state.qvel, this.model.nv);
-    copyBuffer(this.data.ctrl, state.ctrl, this.model.nu);
-    this.data.time = Number.isFinite(state.time) ? state.time : 0;
-  }
-
-  private applyCtrl(ctrl: ArrayLike<number>): void {
-    if (!this.model || !this.data) {
-      return;
-    }
-
-    copyBuffer(this.data.ctrl, ctrl, this.model.nu);
-  }
-
-  private applyHomeCtrl(): void {
-    if (!this.model || !this.data) {
-      return;
-    }
-
-    for (let index = 0; index < this.model.nu; index += 1) {
-      this.data.ctrl[index] = this.homeCtrl[index] ?? 0;
-    }
-  }
-
-  private controlDt(): number {
-    return Math.max(1.0e-6, Number(this.trace?.simulation.controlDt ?? 0.02));
-  }
-
-  private substepsPerFrame(): number {
-    if (!this.model) {
-      return 1;
-    }
-
-    const exportedSubsteps = Math.trunc(Number(this.trace?.simulation.substeps ?? 0));
-    if (exportedSubsteps > 0) {
-      return Math.min(exportedSubsteps, 256);
-    }
-
-    const timestep = Math.max(1.0e-6, Number(this.model.opt?.timestep ?? 0.002));
-    return Math.max(1, Math.min(256, Math.round(this.controlDt() / timestep)));
-  }
-
-  private resetTracePlayback(): void {
-    this.frameIndex = 0;
-    this.frameAccumulator = 0;
-    this.traceEnded = false;
+    this.module.mj_resetData(this.model, this.data);
+    this.module.mj_forward(this.model, this.data);
+    this.racketAnchor = arrayVec3(this.data.site_xpos, this.ids.racketSite * 3);
     this.contactCount = 0;
     this.lastContact = null;
-  }
-
-  private validateTraceModel(): void {
-    if (!this.model || !this.trace) {
-      return;
-    }
-
-    const mismatches = [
-      ["nq", this.trace.simulation.nq, this.model.nq],
-      ["nv", this.trace.simulation.nv, this.model.nv],
-      ["nu", this.trace.simulation.nu, this.model.nu]
-    ].filter(([, expected, actual]) => expected !== actual);
-
-    if (mismatches.length > 0) {
-      const detail = mismatches
-        .map(([name, expected, actual]) => `${name}: rollout=${expected}, model=${actual}`)
-        .join(", ");
-      throw new Error(`Python rollout does not match the loaded MuJoCo model (${detail}). Re-export the rollout.`);
-    }
   }
 
   private loadModel(module: MainModule, scene: string, sceneFormat?: "xml" | "mjb"): MjModel {
@@ -368,7 +337,7 @@ export class MujocoWorld {
       lastContactTime: this.lastContact?.time ?? null,
       lastContact: this.lastContact,
       mujocoLoaded: true,
-      policyLoaded: Boolean(this.trace),
+      policyLoaded: this.liveConnected && this.liveReady,
       policyMessage: this.policyMessage
     };
   }
@@ -385,7 +354,8 @@ export class MujocoWorld {
     if (this.fallbackBallPosition[2] < 0.05) {
       this.fallbackBallPosition = [...ZERO_SNAPSHOT.ball.position] as Vec3;
       this.fallbackBallVelocity = [0, 0, 0];
-      this.resetTracePlayback();
+      this.contactCount = 0;
+      this.lastContact = null;
     }
 
     return this.fallbackSnapshot();
@@ -409,6 +379,24 @@ export class MujocoWorld {
   }
 }
 
+function liveWebSocketUrl(): string {
+  const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
+  return `${protocol}//${window.location.host}/api/live`;
+}
+
+function parseLiveMessage(rawData: unknown): LiveMessage | null {
+  if (typeof rawData !== "string") {
+    return null;
+  }
+
+  try {
+    const message = JSON.parse(rawData) as LiveMessage;
+    return message && typeof message === "object" ? message : null;
+  } catch {
+    return null;
+  }
+}
+
 function arrayVec3(arrayLike: ArrayLike<number>, offset: number): Vec3 {
   return [
     Number(arrayLike[offset] ?? 0),
@@ -422,8 +410,4 @@ function copyBuffer(target: ArrayLike<number>, source: ArrayLike<number>, length
   for (let index = 0; index < length; index += 1) {
     writable[index] = Number(source[index] ?? 0);
   }
-}
-
-function basename(path: string): string {
-  return path.split("/").filter(Boolean).at(-1) ?? path;
 }

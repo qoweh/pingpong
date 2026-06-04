@@ -6,11 +6,12 @@ Current web artifact status:
 | --- | --- |
 | MuJoCo model serving | Added |
 | Three.js viewer | Added |
-| PPO source zip retained | Added |
-| Python rollout export | Added |
-| MuJoCo WASM replay | Added |
+| Python live RL backend | Added |
+| WebSocket state stream | Added |
+| Spring backend | Removed |
+| Browser policy JSON/replay rollout | Removed |
 
-Evaluation metrics to add after rollout export:
+Evaluation metrics to add:
 
 - Average keep-up duration
 - Success rate

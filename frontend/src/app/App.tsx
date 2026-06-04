@@ -64,7 +64,7 @@ export function App() {
               />
               <div className="viewer-title">
                 <h1>Ping-Pong Keep-Up with Reinforcement Learning</h1>
-                <p>MuJoCo WebAssembly viewer for the Panda racket keep-up scene.</p>
+                <p>Live Python PPO control streamed into a MuJoCo WebAssembly viewer.</p>
               </div>
               <div className="runtime-status">
                 <span className={snapshot.mujocoLoaded ? "status-dot ready" : "status-dot"} />
@@ -98,7 +98,7 @@ export function App() {
                   <strong>{snapshot.time.toFixed(2)}s</strong>
                 </div>
                 <div>
-                  <span>Trace</span>
+                  <span>Live RL</span>
                   <strong>{snapshot.policyLoaded ? "Loaded" : "Pending"}</strong>
                 </div>
               </div>
