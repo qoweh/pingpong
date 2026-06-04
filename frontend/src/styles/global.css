@@ -110,7 +110,7 @@ button {
   top: 20px;
   left: 24px;
   z-index: 4;
-  max-width: min(560px, calc(100% - 420px));
+  max-width: min(720px, calc(100% - 420px));
   color: #f7f7f7;
   text-shadow: 0 1px 18px rgba(0, 0, 0, 0.65);
   pointer-events: none;
@@ -128,6 +128,7 @@ button {
   color: rgba(255, 255, 255, 0.72);
   font-size: 0.9rem;
   line-height: 1.35;
+  white-space: nowrap;
 }
 
 .runtime-status {
@@ -760,6 +761,10 @@ select {
     max-width: calc(100% - 28px);
     top: 16px;
     left: 14px;
+  }
+
+  .viewer-title p {
+    white-space: normal;
   }
 
   .runtime-status {
