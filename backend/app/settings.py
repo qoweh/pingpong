@@ -27,7 +27,7 @@ def load_settings() -> AppSettings:
     model_path = resolve_path(
         value(
             "PINGPONG_POLICY_MODEL_PATH",
-            "rl/artifacts/pmk_cf_self_rally_v25/pmk_cf_self_rally_v25_model.zip",
+            "rl/artifacts/keep_v39_17d/keep_v39_17d_model.zip",
         ),
         project_root,
     )

@@ -15,12 +15,12 @@ const AXES: Array<{
   max: number;
   step: number;
 }> = [
-  { key: "xOffset", label: "X Position", min: -0.12, max: 0.12, step: 0.005 },
-  { key: "yOffset", label: "Y Position", min: -0.12, max: 0.12, step: 0.005 },
-  { key: "zOffset", label: "Z Position", min: 0.15, max: 0.7, step: 0.005 },
-  { key: "velocityX", label: "X Velocity", min: -0.45, max: 0.45, step: 0.01 },
-  { key: "velocityY", label: "Y Velocity", min: -0.45, max: 0.45, step: 0.01 },
-  { key: "velocityZ", label: "Z Velocity", min: -0.4, max: 0.4, step: 0.01 }
+  { key: "xOffset", label: "X Position", min: -0.15, max: 0.15, step: 0.005 },
+  { key: "yOffset", label: "Y Position", min: -0.15, max: 0.15, step: 0.005 },
+  { key: "zOffset", label: "Z Position", min: 0.18, max: 0.56, step: 0.005 },
+  { key: "velocityX", label: "X Velocity", min: -0.06, max: 0.06, step: 0.005 },
+  { key: "velocityY", label: "Y Velocity", min: -0.06, max: 0.06, step: 0.005 },
+  { key: "velocityZ", label: "Z Velocity", min: -0.18, max: 0.04, step: 0.005 }
 ];
 
 export function BallControls({ value, onChange }: BallControlsProps) {

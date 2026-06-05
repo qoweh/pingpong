@@ -27,7 +27,7 @@
 | 기본 공 시작 높이 | 0.34 m above racket |
 | 목표 공 높이 | 0.30 m above racket |
 | 높이 허용 범위 | 0.10 m |
-| episode 최대 step | 1800 |
+| episode 최대 step | 웹 runtime은 고정 제한 없음, v39 분석 기준 7200 step |
 
 ## 초기화와 공 배치
 

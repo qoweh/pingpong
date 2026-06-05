@@ -1,6 +1,6 @@
 # 상태와 행동
 
-현재 선택된 제어 모델은 공의 위치, 속도, 라켓 상태, 예상 접촉 정보를 입력으로 받아 라켓의 다음 목표를 보정한다. 내부 action mode는 `position_contact_frame_velocity_tilt_lateral_apex_residual`이다.
+현재 선택된 제어 모델은 공의 위치, 속도, 라켓 상태, 예상 접촉 정보를 입력으로 받아 라켓의 다음 목표를 보정한다. 내부 action mode는 `position_contact_frame_velocity_tilt_lateral_apex_tracking_residual`이다.
 
 이 이름은 길지만 의미는 단순하다. 기본 컨트롤러가 예측한 라켓 목표 위치와 자세가 있고, 학습 모델은 그 목표를 조금씩 보정하면서 공을 다시 칠 수 있는 상태로 만든다.
 
@@ -36,7 +36,8 @@
 | Racket vertical velocity / tilt scale residual | 3 | 라켓 수직 속도와 tilt scale 보정 |
 | Racket XY velocity residual | 2 | 라켓 수평 속도 보정 |
 | Apex timing residual | 2 | 목표 apex와 strike plane 보정 |
-| Total | 15 | 모델 출력 전체 |
+| Tracking XY residual | 2 | 다음 접촉 지점 추적 속도 보정 |
+| Total | 17 | 모델 출력 전체 |
 
 ## episode 종료 조건
 

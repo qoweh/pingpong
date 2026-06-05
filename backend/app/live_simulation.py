@@ -34,7 +34,7 @@ class LiveSimulationService:
         self.env_kwargs["scene_path"] = str(settings.scene_path)
         self.policy = PPO.load(settings.model_path, device="cpu")
         self.policy_lock = threading.Lock()
-        self.policy_message = f"Model: {settings.model_path.name}"
+        self.policy_message = f"Model: {display_model_name(settings.model_path)}"
         self.control_dt = 0.02
 
     def create_session(self) -> "LiveSimulationSession":
@@ -274,3 +274,12 @@ def portable_path(path: Path, root: Path) -> str:
         return str(path.relative_to(root))
     except ValueError:
         return str(path)
+
+
+def display_model_name(path: Path) -> str:
+    stem = path.stem
+    if stem.endswith("_best_model"):
+        return stem[:-11]
+    if stem.endswith("_model"):
+        return stem[:-6]
+    return stem
