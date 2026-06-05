@@ -64,6 +64,10 @@ type LiveMessage =
   | {
       type: "ready";
       config: Record<string, unknown>;
+    }
+  | {
+      type: "error";
+      message: string;
     };
 
 type LoadingProgressListener = (progress: LoadingProgress) => void;
@@ -270,6 +274,12 @@ export class MujocoWorld {
         return;
       }
 
+      if (message.type === "error") {
+        this.liveReady = false;
+        this.policyMessage = message.message;
+        return;
+      }
+
       this.latestFrame = message;
       this.liveReady = true;
       this.policyMessage = message.policyMessage;
@@ -428,8 +438,8 @@ export class MujocoWorld {
         throw new Error(formatMujocoModelLoadError(primaryError, manifest.scene, manifest.sceneFormat));
       }
 
-      notifyProgress(onProgress, 80, "Compiled scene did not open; loading source scene");
-      await this.loadSceneAssets(fallback.files, fallback.modelRoot, onProgress, 80, 5, "Loading source 3D scene");
+      notifyProgress(onProgress, 80, `Compiled scene did not open; loading ${fallback.files.length} source assets`);
+      await this.loadSceneAssets(fallback.files, fallback.modelRoot, onProgress, 80, 5, "Loading source 3D scene asset");
       try {
         notifyProgress(onProgress, 85, "Opening source 3D scene");
         return this.loadModel(module, fallback.scene, fallback.sceneFormat);

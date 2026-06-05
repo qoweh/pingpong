@@ -11,6 +11,19 @@ from .ball_spawn import BallSpawnConfig, build_ball_spawn_config
 
 
 EnvResolver = Callable[[Path], dict[str, Any]]
+SUPPORTED_ACTION_MODES = {
+    "position",
+    "position_strike",
+    "position_tilt",
+    "position_strike_tilt",
+    "position_strike_tilt_lift",
+    "position_contact_frame",
+    "position_contact_frame_velocity_residual",
+    "position_contact_frame_velocity_tilt_residual",
+    "position_contact_frame_velocity_tilt_lateral_residual",
+    "position_contact_frame_velocity_tilt_lateral_apex_residual",
+    "position_contact_frame_velocity_tilt_lateral_apex_tracking_residual",
+}
 
 
 @dataclass(frozen=True)
@@ -91,6 +104,7 @@ def build_model_record(
     model_id = unique_id(raw_run_name, used_ids)
 
     labels = normalized_action_labels(summary_action_labels(summary), action_mode, action_dim)
+    runtime_compatible = action_mode in SUPPORTED_ACTION_MODES
 
     metadata = {
         "id": model_id,
@@ -106,6 +120,10 @@ def build_model_record(
         "observationDim": observation_dim,
         "actionDim": action_dim,
         "actionMode": action_mode,
+        "runtimeCompatible": runtime_compatible,
+        "compatibilityMessage": None
+        if runtime_compatible
+        else f"This legacy model uses an unsupported action mode: {action_mode}.",
         "actionLabels": labels,
         "actionLow": action_low,
         "actionHigh": action_high,

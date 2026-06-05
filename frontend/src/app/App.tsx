@@ -1,4 +1,4 @@
-import { ExternalLink, PanelRightClose, PanelRightOpen, RefreshCw } from "lucide-react";
+import { ExternalLink, PanelLeftClose, PanelLeftOpen, PanelRightClose, PanelRightOpen, RefreshCw } from "lucide-react";
 import { lazy, Suspense, useCallback, useEffect, useMemo, useState } from "react";
 
 import { ActionVisualizer } from "../components/ActionVisualizer";
@@ -48,6 +48,8 @@ export function App() {
   const [loadingProgress, setLoadingProgress] = useState<LoadingProgress>(INITIAL_LOADING_PROGRESS);
   const [resetSignal, setResetSignal] = useState(0);
   const [ballSpawnSignal, setBallSpawnSignal] = useState(0);
+  const [cameraResetSignal, setCameraResetSignal] = useState(0);
+  const [modelPanelOpen, setModelPanelOpen] = useState(true);
   const [controlsOpen, setControlsOpen] = useState(true);
   const selectedModel = useMemo(
     () => models.find((model) => model.id === activeModelId) ?? models[0] ?? null,
@@ -58,6 +60,8 @@ export function App() {
   const heightText = ready ? `${ballHeightAboveRacket.toFixed(2)}m` : "--";
   const contactText = ready ? String(snapshot.contactCount) : "--";
   const timeText = ready ? `${snapshot.time.toFixed(2)}s` : "--";
+  const modelSwitchHint = "Different action dimensions may take longer.";
+  const showLoadingOverlay = !ready || modelSwitching;
 
   const reset = useCallback(() => {
     setPlayback("paused");
@@ -88,32 +92,60 @@ export function App() {
 
       setModelError(null);
       setModelSwitching(true);
+      const previousPlayback = playback;
       setPlayback("paused");
-      setStatus("Loading selected model");
-      setLoadingProgress({ percent: 94, message: "Loading selected model" });
+      const targetModel = models.find((model) => model.id === modelId);
+      if (targetModel?.runtimeCompatible === false) {
+        const message = targetModel.compatibilityMessage ?? "This model is not compatible with the current runtime.";
+        setModelError(message);
+        setStatus(message);
+        setLoadingProgress({ percent: 100, message });
+        await delay(1200);
+        setPlayback(previousPlayback);
+        setModelSwitching(false);
+        return;
+      }
+      const sameDimension = Boolean(
+        selectedModel?.actionDim && targetModel?.actionDim && selectedModel.actionDim === targetModel.actionDim
+      );
+      setStatus(sameDimension ? "Switching same-dimension model" : "Switching model dimension");
+      setLoadingProgress({
+        percent: 8,
+        message: sameDimension ? "Preparing same-dimension model switch" : "Preparing model dimension switch"
+      });
 
       try {
+        setLoadingProgress({ percent: 24, message: "Requesting model switch" });
         const response = await fetch("/api/models/select", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ modelId })
         });
+        setLoadingProgress({ percent: 68, message: "Loading policy runtime" });
         if (!response.ok) {
-          throw new Error(`Model switch failed (${response.status})`);
+          throw new Error(await modelSwitchErrorMessage(response));
         }
         const parsed = parseModelsPayload(await response.json());
+        setLoadingProgress({ percent: 90, message: "Applying model metadata" });
         if (!parsed) {
           throw new Error("Model response was not readable.");
         }
         applyModelsPayload(parsed);
+        setLoadingProgress({ percent: 100, message: "Model ready" });
         setPlayback("playing");
+        await delay(180);
       } catch (error) {
-        setModelError(error instanceof Error ? error.message : "Model switch failed.");
+        const message = error instanceof Error ? error.message : "Model switch failed.";
+        setModelError(message);
+        setStatus(message);
+        setLoadingProgress({ percent: 100, message });
+        await delay(1200);
+        setPlayback(previousPlayback);
       } finally {
         setModelSwitching(false);
       }
     },
-    [activeModelId, applyModelsPayload, modelSwitching]
+    [activeModelId, applyModelsPayload, modelSwitching, models, playback, selectedModel?.actionDim]
   );
 
   const updateStatus = useCallback((message: string) => {
@@ -212,6 +244,7 @@ export function App() {
                     onProgress={updateLoadingProgress}
                     resetSignal={resetSignal}
                     ballSpawnSignal={ballSpawnSignal}
+                    cameraResetSignal={cameraResetSignal}
                   />
                 </Suspense>
                 <div className="viewer-title">
@@ -221,8 +254,44 @@ export function App() {
                   <span className={ready ? "status-dot ready" : "status-dot"} />
                   <span>{ready ? "Simulation Ready" : snapshot.mujocoLoaded ? snapshot.policyMessage : status}</span>
                 </div>
-                {!ready ? <LoadingOverlay status={status} snapshot={snapshot} progress={loadingProgress} /> : null}
+                {showLoadingOverlay ? (
+                  <LoadingOverlay
+                    status={status}
+                    snapshot={snapshot}
+                    progress={loadingProgress}
+                    title={modelSwitching ? "Switching model" : "Preparing the scene"}
+                    kicker={modelSwitching ? "Model selection" : "Starting simulation"}
+                    modelSwitching={modelSwitching}
+                  />
+                ) : null}
               </section>
+
+              <div className={modelPanelOpen ? "model-shell open" : "model-shell closed"}>
+                <button
+                  className="panel-toggle left"
+                  type="button"
+                  title={modelPanelOpen ? "Hide model panel" : "Show model panel"}
+                  aria-label={modelPanelOpen ? "Hide model panel" : "Show model panel"}
+                  onClick={() => setModelPanelOpen((open) => !open)}
+                >
+                  {modelPanelOpen ? <PanelLeftClose size={18} /> : <PanelLeftOpen size={18} />}
+                </button>
+
+                {modelPanelOpen ? (
+                  <aside className="model-pane" aria-label="Model and policy output">
+                    <ModelControls
+                      models={models}
+                      activeModelId={activeModelId}
+                      selectedModel={selectedModel}
+                      switching={modelSwitching}
+                      error={modelError}
+                      switchHint={modelSwitchHint}
+                      onSelect={selectModel}
+                    />
+                    <ActionVisualizer action={snapshot.action} model={selectedModel} />
+                  </aside>
+                ) : null}
+              </div>
 
               <div className={controlsOpen ? "control-shell open" : "control-shell closed"}>
                 <button
@@ -237,14 +306,6 @@ export function App() {
 
                 {controlsOpen ? (
                   <aside className="control-pane" aria-label="Simulation controls">
-                    <ModelControls
-                      models={models}
-                      activeModelId={activeModelId}
-                      selectedModel={selectedModel}
-                      switching={modelSwitching}
-                      error={modelError}
-                      onSelect={selectModel}
-                    />
                     <PlaybackControls playback={playback} onPlaybackChange={setPlayback} onReset={reset} />
 
                     <div className="metrics-grid">
@@ -272,11 +333,15 @@ export function App() {
                       config={ballSpawnConfig}
                       onChange={updateBallSpawn}
                     />
-                    <CameraControls value={cameraMode} onChange={setCameraMode} />
+                    <CameraControls
+                      value={cameraMode}
+                      onChange={setCameraMode}
+                      onResetView={() => {
+                        setCameraMode("free");
+                        setCameraResetSignal((signal) => signal + 1);
+                      }}
+                    />
                     <VisualizationToggles value={visualization} onChange={setVisualization} />
-                    <ActionVisualizer action={snapshot.action} model={selectedModel} />
-
-                    <div className="policy-note">{snapshot.policyMessage}</div>
                   </aside>
                 ) : null}
               </div>
@@ -291,20 +356,26 @@ export function App() {
 function LoadingOverlay({
   status,
   snapshot,
-  progress
+  progress,
+  title,
+  kicker,
+  modelSwitching
 }: {
   status: string;
   snapshot: SimulationSnapshot;
   progress: LoadingProgress;
+  title: string;
+  kicker: string;
+  modelSwitching: boolean;
 }) {
   const percent = Math.min(100, Math.max(0, Math.round(progress.percent)));
   const message = progress.message || status;
   return (
     <div className="loading-overlay" role="status" aria-live="polite">
       <div className="loading-panel">
-        <span className="loading-kicker">Starting simulation</span>
+        <span className="loading-kicker">{kicker}</span>
         <div className="loading-heading">
-          <h2>Preparing the scene</h2>
+          <h2>{title}</h2>
           <strong>{percent}%</strong>
         </div>
         <div
@@ -318,11 +389,21 @@ function LoadingOverlay({
           <span style={{ width: `${percent}%` }} />
         </div>
         <div className="loading-steps">
-          <span className={snapshot.mujocoLoaded ? "done" : ""}>
-            {snapshot.mujocoLoaded ? "3D scene ready" : message}
-          </span>
-          <span className={snapshot.policyLoaded ? "done" : ""}>{snapshot.policyMessage}</span>
-          <span>First uncached load can take several seconds on a server.</span>
+          {modelSwitching ? (
+            <>
+              <span className="done">3D scene stays loaded</span>
+              <span>{message}</span>
+              <span>Cached models usually switch faster.</span>
+            </>
+          ) : (
+            <>
+              <span className={snapshot.mujocoLoaded ? "done" : ""}>
+                {snapshot.mujocoLoaded ? "3D scene ready" : message}
+              </span>
+              <span className={snapshot.policyLoaded ? "done" : ""}>{snapshot.policyMessage}</span>
+              <span>First uncached load can take several seconds on a server.</span>
+            </>
+          )}
         </div>
         <div className="loading-actions">
           <button className="loading-refresh" type="button" onClick={() => window.location.reload()} aria-label="Refresh page">
@@ -333,4 +414,20 @@ function LoadingOverlay({
       </div>
     </div>
   );
+}
+
+async function modelSwitchErrorMessage(response: Response): Promise<string> {
+  try {
+    const body = (await response.json()) as { detail?: unknown };
+    if (typeof body.detail === "string" && body.detail) {
+      return body.detail;
+    }
+  } catch {
+    // Fall back to status text below.
+  }
+  return `Model switch failed (${response.status}).`;
+}
+
+function delay(ms: number): Promise<void> {
+  return new Promise((resolve) => window.setTimeout(resolve, ms));
 }

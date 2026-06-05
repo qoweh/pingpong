@@ -83,6 +83,10 @@ export class DemoController {
     this.emit(true);
   }
 
+  resetCamera(): void {
+    this.renderer.resetFreeCamera();
+  }
+
   spawnBall(settings: BallSpawnSettings): void {
     this.snapshot = this.world.spawnBall(settings);
     this.emit(true);

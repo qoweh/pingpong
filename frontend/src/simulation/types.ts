@@ -15,6 +15,7 @@ export interface VisualizationSettings {
   trail: boolean;
   targetBand: boolean;
   contactMarker: boolean;
+  racketDisplay: "training" | "presentation";
 }
 
 export interface BallSpawnSettings {
@@ -72,6 +73,8 @@ export interface ModelMetadata {
   observationDim?: number | null;
   actionDim?: number | null;
   actionMode?: string | null;
+  runtimeCompatible?: boolean;
+  compatibilityMessage?: string | null;
   actionLabels?: string[];
   actionLow?: number[] | null;
   actionHigh?: number[] | null;
@@ -136,7 +139,8 @@ export interface DemoConfig {
 export const DEFAULT_VISUALIZATION: VisualizationSettings = {
   trail: false,
   targetBand: false,
-  contactMarker: false
+  contactMarker: false,
+  racketDisplay: "training"
 };
 
 export const DEFAULT_BALL_SPAWN: BallSpawnSettings = {

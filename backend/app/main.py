@@ -11,7 +11,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 
-from .live_simulation import LiveSimulationHub, LiveSimulationService
+from .live_simulation import LiveSimulationHub, LiveSimulationService, ModelSelectionError
 from .settings import load_settings
 
 
@@ -79,6 +79,8 @@ async def select_model(payload: dict[str, Any] = Body(...)) -> dict[str, Any]:
         return await app.state.live_hub.select_model(model_id)
     except KeyError as exc:
         raise HTTPException(status_code=404, detail=f"Unknown model: {model_id}") from exc
+    except ModelSelectionError as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
 
 
 @app.websocket("/api/live")

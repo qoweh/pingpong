@@ -8,10 +8,19 @@ interface ModelControlsProps {
   selectedModel: ModelMetadata | null;
   switching: boolean;
   error: string | null;
+  switchHint: string;
   onSelect: (modelId: string) => void;
 }
 
-export function ModelControls({ models, activeModelId, selectedModel, switching, error, onSelect }: ModelControlsProps) {
+export function ModelControls({
+  models,
+  activeModelId,
+  selectedModel,
+  switching,
+  error,
+  switchHint,
+  onSelect
+}: ModelControlsProps) {
   const groups = useMemo(() => groupModels(models), [models]);
 
   return (
@@ -20,6 +29,7 @@ export function ModelControls({ models, activeModelId, selectedModel, switching,
         <h2>Model</h2>
         {selectedModel?.dimensionGroup ? <span>{selectedModel.dimensionGroup}</span> : null}
       </div>
+      <span className="inline-status">{switchHint}</span>
       <select
         value={activeModelId ?? ""}
         disabled={switching || models.length === 0}
@@ -29,7 +39,7 @@ export function ModelControls({ models, activeModelId, selectedModel, switching,
         {groups.map((group) => (
           <optgroup key={group.label} label={`${group.label} models`}>
             {group.models.map((model) => (
-              <option key={model.id} value={model.id}>
+              <option key={model.id} value={model.id} disabled={model.runtimeCompatible === false}>
                 {optionLabel(model)}
               </option>
             ))}
@@ -38,30 +48,17 @@ export function ModelControls({ models, activeModelId, selectedModel, switching,
       </select>
       {switching ? <span className="inline-status">Loading selected model...</span> : null}
       {error ? <span className="inline-status error">{error}</span> : null}
+      {selectedModel?.runtimeCompatible === false && selectedModel.compatibilityMessage ? (
+        <span className="inline-status error">{selectedModel.compatibilityMessage}</span>
+      ) : null}
       {selectedModel ? (
         <div className="model-info-grid" aria-label="Model information">
           <span>Series</span>
-          <strong title={selectedModel.path}>{selectedModel.name}</strong>
-          <span>Run</span>
-          <strong title={selectedModel.rawRunName ?? selectedModel.path}>
-            {selectedModel.detailName ?? selectedModel.rawRunName ?? "--"}
-          </strong>
-          <span>Algorithm</span>
-          <strong>{selectedModel.algorithm}</strong>
+          <strong>{selectedModel.name}</strong>
           <span>Observation</span>
           <strong>{formatDim(selectedModel.observationDim)}</strong>
           <span>Action</span>
           <strong>{formatDim(selectedModel.actionDim)}</strong>
-          <span>Action Mode</span>
-          <strong title={selectedModel.actionMode ?? ""}>{selectedModel.actionMode ?? "unknown"}</strong>
-          <span>Train XY</span>
-          <strong>{formatXYRange(selectedModel)}</strong>
-          <span>Train Z</span>
-          <strong>{formatRange(selectedModel.trainedRanges?.zOffset, "m")}</strong>
-          <span>Train Vel</span>
-          <strong>{formatRange(selectedModel.trainedRanges?.velocityX, "m/s")}</strong>
-          <span>Summary</span>
-          <strong title={selectedModel.trainingSummaryPath ?? ""}>{selectedModel.trainingSummaryPath ? "available" : "--"}</strong>
         </div>
       ) : null}
     </div>
@@ -104,27 +101,9 @@ function modelOrder(left: ModelMetadata, right: ModelMetadata): number {
 }
 
 function optionLabel(model: ModelMetadata): string {
-  if (model.versionLabel || model.detailName) {
-    return [model.versionLabel, model.detailName].filter(Boolean).join(" · ");
-  }
-  return model.displayName;
+  return model.name || model.displayName;
 }
 
 function formatDim(value: number | null | undefined): string {
   return typeof value === "number" ? `${value}D` : "--";
-}
-
-function formatXYRange(model: ModelMetadata): string {
-  const trainedRadius = model.ballSpawn?.xyConstraint?.trainedRadius;
-  if (model.ballSpawn?.xyConstraint?.sampling === "disk" && typeof trainedRadius === "number") {
-    return `r <= ${trainedRadius.toFixed(3)}m`;
-  }
-  return formatRange(model.trainedRanges?.xOffset, "m");
-}
-
-function formatRange(range: { min: number; max: number } | undefined, unit: string): string {
-  if (!range) {
-    return "--";
-  }
-  return `${range.min.toFixed(3)}..${range.max.toFixed(3)} ${unit}`;
 }

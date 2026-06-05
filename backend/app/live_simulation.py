@@ -23,6 +23,10 @@ from .settings import AppSettings
 LOGGER = logging.getLogger(__name__)
 
 
+class ModelSelectionError(RuntimeError):
+    pass
+
+
 @dataclass
 class LiveCommandState:
     playback: str = "playing"
@@ -79,6 +83,14 @@ class LiveSimulationService:
         with self._runtime_lock:
             runtime = self.active_runtime
         return LiveSimulationSession(self, runtime)
+
+    def current_runtime(self) -> RuntimeModel:
+        with self._runtime_lock:
+            return self.active_runtime
+
+    def activate_runtime(self, runtime: RuntimeModel) -> None:
+        with self._runtime_lock:
+            self.active_runtime = runtime
 
     @property
     def ball_spawn_config(self) -> dict[str, Any]:
@@ -259,8 +271,18 @@ class LiveSimulationHub:
 
     async def select_model(self, model_id: str) -> dict[str, Any]:
         async with self._lock:
-            payload = await self._run_sync(self.service.select_model, model_id)
-            self.session = await self._run_sync(self.service.create_session)
+            previous_runtime = await self._run_sync(self.service.current_runtime)
+            previous_session = self.session
+            try:
+                payload = await self._run_sync(self.service.select_model, model_id)
+                next_session = await self._run_sync(self.service.create_session)
+            except Exception as exc:
+                await self._run_sync(self.service.activate_runtime, previous_runtime)
+                self.session = previous_session
+                LOGGER.exception("Model selection failed for %s", model_id)
+                raise ModelSelectionError(model_selection_message(model_id, exc)) from exc
+
+            self.session = next_session
             self.command_state.reset_requested = False
             self.command_state.reset_options = None
             self.command_state.ball_spawn_requested = False
@@ -275,33 +297,45 @@ class LiveSimulationHub:
 
     async def _run(self) -> None:
         while True:
-            if not self.subscribers:
-                await asyncio.sleep(0.25)
-                continue
+            try:
+                if not self.subscribers:
+                    await asyncio.sleep(0.25)
+                    continue
 
-            async with self._lock:
-                session = await self._ensure_session_locked()
-                state = self.command_state
-                if state.reset_requested:
-                    state.reset_requested = False
-                    reset_options = state.reset_options
-                    state.reset_options = None
-                    frame = await self._run_sync(session.reset, reset_options)
-                elif state.ball_spawn_requested:
-                    state.ball_spawn_requested = False
-                    spawn_options = state.ball_spawn_options or {}
-                    state.ball_spawn_options = None
-                    frame = await self._run_sync(session.spawn_ball, spawn_options)
-                elif state.playback == "playing":
-                    frame = await self._run_sync(session.step)
-                else:
-                    frame = await self._run_sync(session.frame)
+                async with self._lock:
+                    session = await self._ensure_session_locked()
+                    state = self.command_state
+                    if state.reset_requested:
+                        state.reset_requested = False
+                        reset_options = state.reset_options
+                        state.reset_options = None
+                        frame = await self._run_sync(session.reset, reset_options)
+                    elif state.ball_spawn_requested:
+                        state.ball_spawn_requested = False
+                        spawn_options = state.ball_spawn_options or {}
+                        state.ball_spawn_options = None
+                        frame = await self._run_sync(session.spawn_ball, spawn_options)
+                    elif state.playback == "playing":
+                        frame = await self._run_sync(session.step)
+                    else:
+                        frame = await self._run_sync(session.frame)
 
-                self.last_frame = frame
-                delay = session.control_dt if state.playback == "playing" else 0.1
+                    self.last_frame = frame
+                    delay = session.control_dt if state.playback == "playing" else 0.1
 
-            self._publish(frame)
-            await asyncio.sleep(delay)
+                self._publish(frame)
+                await asyncio.sleep(delay)
+            except asyncio.CancelledError:
+                raise
+            except Exception:
+                LOGGER.exception("Live simulation loop failed")
+                self._publish(
+                    {
+                        "type": "error",
+                        "message": "Live simulation paused because the selected model could not run. Choose another model.",
+                    }
+                )
+                await asyncio.sleep(0.5)
 
     async def _ensure_session_locked(self) -> "LiveSimulationSession":
         if self.session is None or self.session.runtime is not self.service.active_runtime:
@@ -329,6 +363,15 @@ def offer_queue_message(queue: asyncio.Queue[dict[str, Any]], message: dict[str,
         queue.put_nowait(message)
     except asyncio.QueueFull:
         pass
+
+
+def model_selection_message(model_id: str, error: Exception) -> str:
+    detail = str(error)
+    if "action_mode must be one of" in detail:
+        return f"Model {model_id} is not compatible with the current runtime action mode."
+    if detail:
+        return f"Model {model_id} could not be loaded: {detail}"
+    return f"Model {model_id} could not be loaded."
 
 
 class LiveSimulationSession:

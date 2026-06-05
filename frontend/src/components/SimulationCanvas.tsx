@@ -20,6 +20,7 @@ interface SimulationCanvasProps {
   onProgress: (progress: LoadingProgress) => void;
   resetSignal: number;
   ballSpawnSignal: number;
+  cameraResetSignal: number;
 }
 
 export function SimulationCanvas({
@@ -31,7 +32,8 @@ export function SimulationCanvas({
   onStatus,
   onProgress,
   resetSignal,
-  ballSpawnSignal
+  ballSpawnSignal,
+  cameraResetSignal
 }: SimulationCanvasProps) {
   const hostRef = useRef<HTMLDivElement | null>(null);
   const controllerRef = useRef<DemoController | null>(null);
@@ -74,6 +76,12 @@ export function SimulationCanvas({
       controllerRef.current?.spawnBall(ballSpawn);
     }
   }, [ballSpawnSignal, ballSpawn]);
+
+  useEffect(() => {
+    if (cameraResetSignal > 0) {
+      controllerRef.current?.resetCamera();
+    }
+  }, [cameraResetSignal]);
 
   return <div ref={hostRef} className="simulation-canvas" />;
 }

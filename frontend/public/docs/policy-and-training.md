@@ -121,7 +121,7 @@ MuJoCo state
   -> rendered frame
 ```
 
-브라우저는 action 값과 policy 구조를 시각화하고, 공 시작 조건이나 재생 상태 같은 사용자의 조작을 서버에 전달한다. 따라서 웹 UI를 바꿔도 policy가 배운 행동 자체가 바뀌지는 않는다. policy를 바꾸려면 새 모델을 학습하거나 다른 모델 zip을 선택해야 한다.
+브라우저는 action 값을 시각화하고, 공 시작 조건이나 재생 상태 같은 사용자의 조작을 서버에 전달한다. 따라서 웹 UI를 바꿔도 policy가 배운 행동 자체가 바뀌지는 않는다. policy를 바꾸려면 새 모델을 학습하거나 다른 모델 zip을 선택해야 한다.
 
 ## 다중 모델 선택
 
@@ -138,9 +138,10 @@ MuJoCo state
 | `algorithm` | PPO |
 | `observationDim` / `actionDim` | SB3 zip metadata의 observation/action space shape |
 | `actionMode` | training summary에서 복원한 action mode |
+| `runtimeCompatible` / `compatibilityMessage` | 현재 서버 런타임에서 열 수 있는 모델인지 여부와 비호환 사유 |
 | `ballSpawn` | 모델별 학습/검증 공 시작값 범위 |
 | `policy.architecture` | 가능한 경우 policy network 요약 |
-| `trainingSummaryPath` | summary JSON 위치 |
+| `trainingSummaryPath` | 내부 추적용 summary JSON 위치 |
 
 예시 응답:
 
@@ -152,19 +153,17 @@ MuJoCo state
       "id": "keep_v39_17d",
       "name": "17D V11",
       "displayName": "17D V11 · Current v39",
-      "rawRunName": "keep_v39_17d",
       "dimensionGroup": "17D",
       "versionLabel": "V11",
-      "algorithm": "PPO",
       "observationDim": 55,
       "actionDim": 17,
-      "actionMode": "position_contact_frame_velocity_tilt_lateral_apex_tracking_residual"
+      "runtimeCompatible": true
     }
   ]
 }
 ```
 
-`rl1`, `rl2`, `rl3`처럼 실험 시점별로 나뉜 legacy run은 action dimension별로 묶고, 같은 dimension 안에서는 오래된 run부터 `V1`, `V2`를 부여한다. UI에서는 가장 최신 버전이 위에 오므로 예를 들어 `keep1_v36_17d_balanced_xyz012`는 `17D V8 · Keep-up v36 Balanced`처럼 보이고, 원본 run 이름은 `rawRunName`으로 남긴다.
+`rl1`, `rl2`, `rl3`처럼 실험 시점별로 나뉜 legacy run은 action dimension별로 묶고, 같은 dimension 안에서는 오래된 run부터 `V1`, `V2`를 부여한다. UI에서는 가장 최신 버전이 위에 오므로 예를 들어 `keep1_v36_17d_balanced_xyz012`는 `17D V8`처럼 보인다. 원본 run 이름과 path는 내부 metadata로만 유지하고 선택 UI에는 노출하지 않는다.
 
 ## Policy output/action 시각화
 
@@ -177,7 +176,7 @@ MuJoCo state
 | 17D | 17개 action bar |
 | 새 차원 | metadata의 `actionDim`만 맞으면 같은 컴포넌트로 표시 |
 
-Action label은 training summary에 명시된 값이 있으면 우선 사용하고, 없으면 action mode 기반 라벨을 생성한다. 둘 다 없거나 차원이 맞지 않으면 `Control 1`, `Control 2` 형태로 채운다. Policy 구조는 SB3 policy 객체에서 linear layer를 읽을 수 있으면 `Observation input -> Hidden layer -> Policy output -> Value estimate` 형태로 표시한다. 여기서 hidden layer는 Stable-Baselines3 policy 안의 fully connected layer이며, `64 units`가 두 번 보이면 64-unit hidden layer가 2개 연속으로 있다는 뜻이다.
+Action label은 training summary에 명시된 값이 있으면 우선 사용하고, 없으면 action mode 기반 라벨을 생성한다. 둘 다 없거나 차원이 맞지 않으면 `Control 1`, `Control 2` 형태로 채운다. Live UI에서는 사용자가 모델 선택과 action 크기를 빠르게 읽는 것이 중요하므로 policy architecture chip은 표시하지 않는다. 발표용으로는 SB3 policy 객체에서 linear layer를 읽어 `Observation -> hidden layers -> policy output/value` 다이어그램을 별도 시각화할 수 있다.
 
 ## 추가 학습 명령어
 

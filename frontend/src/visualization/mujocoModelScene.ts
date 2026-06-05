@@ -1,5 +1,6 @@
 import * as THREE from "three";
 import type { MainModule, MjData, MjModel } from "@mujoco/mujoco";
+import type { VisualizationSettings } from "../simulation/types";
 
 type MujocoRuntime = {
   module: MainModule;
@@ -20,6 +21,8 @@ export class MujocoModelScene {
   private readonly geometries: THREE.BufferGeometry[] = [];
   private readonly materials: THREE.Material[] = [];
   private readonly textures: THREE.Texture[] = [];
+  private racketDisplay: VisualizationSettings["racketDisplay"] = "training";
+  private racketHeadMaterial: THREE.MeshStandardMaterial | null = null;
 
   constructor(private readonly runtime: MujocoRuntime) {
     this.root.name = "MuJoCo Root";
@@ -35,6 +38,14 @@ export class MujocoModelScene {
       setThreeQuaternion(data.xquat, bodyId, body.quaternion);
       body.updateWorldMatrix(false, true);
     }
+  }
+
+  setRacketDisplay(mode: VisualizationSettings["racketDisplay"]): void {
+    if (this.racketDisplay === mode) {
+      return;
+    }
+    this.racketDisplay = mode;
+    this.updateRacketHeadMaterial();
   }
 
   dispose(): void {
@@ -213,7 +224,7 @@ export class MujocoModelScene {
     let material: THREE.MeshStandardMaterial | null = null;
     if (geomName === "racket_head") {
       material = new THREE.MeshStandardMaterial({
-        color: 0xb91c1c,
+        color: racketHeadColor(this.racketDisplay),
         roughness: 0.74,
         metalness: 0,
         side: THREE.FrontSide,
@@ -221,6 +232,7 @@ export class MujocoModelScene {
         polygonOffsetFactor: -1,
         polygonOffsetUnits: -1
       });
+      this.racketHeadMaterial = material;
     } else if (geomName === "racket_rim") {
       material = new THREE.MeshStandardMaterial({
         color: 0xd8c89f,
@@ -250,6 +262,10 @@ export class MujocoModelScene {
 
     this.materials.push(material);
     return material;
+  }
+
+  private updateRacketHeadMaterial(): void {
+    this.racketHeadMaterial?.color.setHex(racketHeadColor(this.racketDisplay));
   }
 
   private createCheckerTexture(): THREE.Texture {
@@ -321,6 +337,10 @@ export class MujocoModelScene {
     this.geometries.push(geometry);
     return geometry;
   }
+}
+
+function racketHeadColor(mode: VisualizationSettings["racketDisplay"]): number {
+  return mode === "training" ? 0x111111 : 0xb91c1c;
 }
 
 export function mujocoToThree(position: [number, number, number]): THREE.Vector3 {

@@ -35,6 +35,8 @@ export class ThreeScene {
   private lastModelUpdateTime = -1;
   private lastModelUpdateResetSerial = -1;
   private lastModelUpdateModelId: string | null = null;
+  private readonly freeCameraHome: THREE.Vector3;
+  private readonly freeTargetHome: THREE.Vector3;
 
   constructor(private readonly host: HTMLElement) {
     this.scene = new THREE.Scene();
@@ -71,6 +73,8 @@ export class ThreeScene {
     this.controls.panSpeed = 1.8;
     this.controls.zoomSpeed = 1.0;
     this.controls.update();
+    this.freeCameraHome = this.cameras.free.position.clone();
+    this.freeTargetHome = target.clone();
 
     this.scene.add(new THREE.HemisphereLight(0xffffff, 0x1b3146, 2.25));
     const key = new THREE.DirectionalLight(0xffffff, 1.55);
@@ -167,12 +171,23 @@ export class ThreeScene {
     visualization: VisualizationSettings,
     config: DemoConfig
   ): void {
+    this.modelScene?.setRacketDisplay(visualization.racketDisplay);
     if (this.shouldUpdateModelScene(snapshot)) {
       this.modelScene?.update();
     }
     this.updateTrail(snapshot, visualization.trail);
     this.updateTargetBand(snapshot, visualization.targetBand, config);
     this.updateContactMarkers(snapshot, visualization.contactMarker);
+  }
+
+  resetFreeCamera(): void {
+    const camera = this.cameras.free;
+    camera.position.copy(this.freeCameraHome);
+    if (camera instanceof THREE.PerspectiveCamera || camera instanceof THREE.OrthographicCamera) {
+      camera.updateProjectionMatrix();
+    }
+    this.controls.target.copy(this.freeTargetHome);
+    this.controls.update();
   }
 
   private shouldUpdateModelScene(snapshot: SimulationSnapshot): boolean {

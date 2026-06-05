@@ -39,13 +39,6 @@ export function ActionVisualizer({ action, model }: ActionVisualizerProps) {
           );
         })}
       </div>
-      {model?.policy?.architecture?.length ? (
-        <div className="policy-architecture" aria-label="Policy architecture">
-          {model.policy.architecture.map((line) => (
-            <span key={line}>{line}</span>
-          ))}
-        </div>
-      ) : null}
     </div>
   );
 }

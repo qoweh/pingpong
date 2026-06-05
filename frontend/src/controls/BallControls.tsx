@@ -5,7 +5,6 @@ import type { BallSpawnConfig, BallSpawnSettings } from "../simulation/types";
 import { DEFAULT_BALL_SPAWN_CONFIG } from "../simulation/types";
 import {
   clampBallSpawnSettings,
-  isWithinTrainedBallSpawnRange,
   rangeBounds,
   type BallSpawnClampMode
 } from "../simulation/ballSpawnConfig";
@@ -33,7 +32,6 @@ export function BallControls({ value, config, onChange }: BallControlsProps) {
   const activeConfig = config ?? DEFAULT_BALL_SPAWN_CONFIG;
   const [useExtendedRange, setUseExtendedRange] = useState(false);
   const clampMode: BallSpawnClampMode = useExtendedRange ? "extended" : "trained";
-  const trained = isWithinTrainedBallSpawnRange(value, activeConfig);
 
   const updateValue = (key: keyof BallSpawnSettings, rawValue: number) => {
     if (!Number.isFinite(rawValue)) {
@@ -46,10 +44,8 @@ export function BallControls({ value, config, onChange }: BallControlsProps) {
     <div className="control-section">
       <div className="section-heading">
         <h2>Ball Start</h2>
-        <span className={trained ? "range-badge trained" : "range-badge extended"}>
-          {trained ? "Trained range" : "Extended range"}
-        </span>
       </div>
+      <span className="inline-status">Some starts can still fail.</span>
       <label className="toggle-row compact">
         <input
           type="checkbox"

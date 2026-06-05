@@ -38,6 +38,8 @@ function parseModelMetadata(value: unknown): ModelMetadata | null {
     observationDim: readNullableNumber(value.observationDim),
     actionDim: readNullableNumber(value.actionDim),
     actionMode: typeof value.actionMode === "string" ? value.actionMode : null,
+    runtimeCompatible: typeof value.runtimeCompatible === "boolean" ? value.runtimeCompatible : undefined,
+    compatibilityMessage: typeof value.compatibilityMessage === "string" ? value.compatibilityMessage : null,
     actionLabels,
     actionLow: readNumberArray(value.actionLow),
     actionHigh: readNumberArray(value.actionHigh),
