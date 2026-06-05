@@ -21,34 +21,28 @@ export function ModelControls({
   switchHint,
   onSelect
 }: ModelControlsProps) {
-  const groups = useMemo(() => groupModels(models), [models]);
+  const dimensionOptions = useMemo(() => orderModels(models), [models]);
 
   return (
     <div className="control-section model-section">
       <div className="section-heading">
-        <h2>Model</h2>
+        <h2>Action Dimension</h2>
       </div>
       <span className="inline-status">{switchHint}</span>
-      <div className="model-keypad" aria-label="Policy models">
-        {groups.map((group) => (
-          <div className="model-keypad-group" key={group.label}>
-            <span>{group.label}</span>
-            <div className="model-keypad-buttons">
-              {group.models.map((model) => (
-                <button
-                  className={model.id === activeModelId ? "model-key active" : "model-key"}
-                  type="button"
-                  key={model.id}
-                  disabled={switching || model.runtimeCompatible === false}
-                  aria-pressed={model.id === activeModelId}
-                  title={model.name}
-                  onClick={() => onSelect(model.id)}
-                >
-                  {optionLabel(model)}
-                </button>
-              ))}
-            </div>
-          </div>
+      <div className="dimension-picker" aria-label="Policy action dimensions">
+        {dimensionOptions.map((model) => (
+          <button
+            className={model.id === activeModelId ? "dimension-option active" : "dimension-option"}
+            type="button"
+            key={model.id}
+            disabled={switching || model.runtimeCompatible === false}
+            aria-pressed={model.id === activeModelId}
+            title={model.name}
+            onClick={() => onSelect(model.id)}
+          >
+            <strong>{formatDim(model.actionDim)}</strong>
+            <span>{optionLabel(model)}</span>
+          </button>
         ))}
       </div>
       {switching ? <span className="inline-status">Loading selected model...</span> : null}
@@ -68,31 +62,14 @@ export function ModelControls({
   );
 }
 
-type ModelGroup = {
-  label: string;
-  sortDimension: number;
-  models: ModelMetadata[];
-};
-
-function groupModels(models: ModelMetadata[]): ModelGroup[] {
-  const grouped = new Map<string, ModelGroup>();
-  for (const model of models) {
-    const label = model.dimensionGroup ?? formatDim(model.actionDim);
-    const current = grouped.get(label);
-    const sortDimension = model.sortDimension ?? model.actionDim ?? -1;
-    if (current) {
-      current.models.push(model);
-    } else {
-      grouped.set(label, { label, sortDimension, models: [model] });
+function orderModels(models: ModelMetadata[]): ModelMetadata[] {
+  return [...models].sort((left, right) => {
+    const dimensionOrder = (right.sortDimension ?? right.actionDim ?? -1) - (left.sortDimension ?? left.actionDim ?? -1);
+    if (dimensionOrder !== 0) {
+      return dimensionOrder;
     }
-  }
-
-  return [...grouped.values()]
-    .map((group) => ({
-      ...group,
-      models: group.models.sort((left, right) => modelOrder(left, right))
-    }))
-    .sort((left, right) => right.sortDimension - left.sortDimension || left.label.localeCompare(right.label));
+    return modelOrder(left, right);
+  });
 }
 
 function modelOrder(left: ModelMetadata, right: ModelMetadata): number {

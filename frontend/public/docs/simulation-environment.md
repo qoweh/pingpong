@@ -55,7 +55,7 @@ MuJoCo는 기본 단위를 강제하지 않지만, 일관된 단위계를 사용
 
 웹은 라켓 head를 빨간 면으로 보여준다. 이 색상은 policy 입력이나 MuJoCo 충돌 판정을 바꾸지 않는 표시 방식이다.
 
-라켓 body 안에서 손잡이와 head 중심은 XML local `+X` 방향으로 배치되어 있다. 웹 렌더러는 MuJoCo의 Z-up 좌표계를 Three.js의 Y-up 좌표계로 바꾸기 위해 위치를 `(x, y, z) -> (x, z, -y)`로 변환한다. 그래서 웹 화면에서 보이는 축 방향은 MuJoCo viewer의 카메라/축 표시와 다르게 느껴질 수 있지만, body pose와 geom pose는 서버 MuJoCo 상태를 변환해서 그린 것이다.
+라켓 body 안에서 손잡이와 head 중심은 XML local `+X` 방향으로 배치되어 있다. 웹 렌더러는 MuJoCo의 Z-up 좌표계를 Three.js의 Y-up 좌표계로 바꾸기 위해 위치를 `(x, y, z) -> (x, z, -y)`로 변환한다. 회전 quaternion도 같은 축 변환을 적용한다. 그래서 웹 화면에서 보이는 축 방향은 MuJoCo viewer의 카메라/축 표시와 다르게 느껴질 수 있지만, body pose와 geom pose는 서버 MuJoCo 상태를 같은 좌표 변환으로 그린 것이다.
 
 ## 공 배치와 초기 조건
 

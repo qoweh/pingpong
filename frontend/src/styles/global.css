@@ -479,58 +479,53 @@ button {
   color: var(--accent);
 }
 
-.model-keypad {
+.dimension-picker {
   display: grid;
-  gap: 10px;
-}
-
-.model-keypad-group {
-  display: grid;
-  grid-template-columns: 46px minmax(0, 1fr);
-  align-items: start;
-  gap: 8px;
-}
-
-.model-keypad-group > span {
-  padding-top: 9px;
-  color: var(--muted);
-  font-size: 0.74rem;
-  font-weight: 760;
-}
-
-.model-keypad-buttons {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(50px, 1fr));
   gap: 7px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
 }
 
-.model-key {
+.dimension-option {
+  display: grid;
+  gap: 2px;
+  justify-items: start;
   min-width: 0;
-  min-height: 34px;
+  min-height: 52px;
+  padding: 8px 10px;
   border: 1px solid var(--line);
   border-radius: 7px;
   background: #202020;
   color: #e8e8e8;
   cursor: pointer;
-  font-size: 0.84rem;
-  font-weight: 720;
   letter-spacing: 0;
 }
 
-.model-key:hover,
-.model-key:focus-visible {
+.dimension-option strong {
+  color: #f5f5f5;
+  font-size: 1.08rem;
+  line-height: 1;
+}
+
+.dimension-option span {
+  color: var(--muted);
+  font-size: 0.74rem;
+  font-weight: 720;
+}
+
+.dimension-option:hover,
+.dimension-option:focus-visible {
   border-color: rgba(255, 157, 27, 0.72);
   background: rgba(255, 157, 27, 0.14);
   outline: none;
 }
 
-.model-key.active {
+.dimension-option.active {
   border-color: rgba(50, 213, 164, 0.74);
   background: rgba(50, 213, 164, 0.14);
   color: #ffffff;
 }
 
-.model-key:disabled {
+.dimension-option:disabled {
   cursor: not-allowed;
   opacity: 0.45;
 }

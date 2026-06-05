@@ -105,13 +105,11 @@ export function App() {
         setModelSwitching(false);
         return;
       }
-      const sameDimension = Boolean(
-        selectedModel?.actionDim && targetModel?.actionDim && selectedModel.actionDim === targetModel.actionDim
-      );
-      setStatus(sameDimension ? "Switching same-dimension model" : "Switching model dimension");
+      const targetDimension = targetModel?.actionDim ? `${targetModel.actionDim}D` : "selected";
+      setStatus(`Switching to ${targetDimension} policy`);
       setLoadingProgress({
         percent: 8,
-        message: sameDimension ? "Preparing same-dimension model switch" : "Preparing model dimension switch"
+        message: `Preparing ${targetDimension} policy`
       });
 
       try {
@@ -145,7 +143,7 @@ export function App() {
         setModelSwitching(false);
       }
     },
-    [activeModelId, applyModelsPayload, modelSwitching, models, playback, selectedModel?.actionDim]
+    [activeModelId, applyModelsPayload, modelSwitching, models, playback]
   );
 
   const updateStatus = useCallback((message: string) => {

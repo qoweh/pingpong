@@ -16,7 +16,16 @@ import numpy as np
 from stable_baselines3 import PPO
 
 from .ball_spawn import build_ball_spawn_config, parse_ball_spawn_options
-from .model_catalog import ModelRecord, build_model_catalog, is_catalog_visible, with_loaded_policy_metadata
+from .model_catalog import (
+    ModelRecord,
+    build_model_catalog,
+    env_kwargs_with_summary_hints,
+    infer_run_name,
+    is_catalog_visible,
+    read_json,
+    training_summary_path,
+    with_loaded_policy_metadata,
+)
 from .settings import AppSettings
 
 
@@ -55,12 +64,22 @@ class RuntimeModel:
         return self.record.metadata
 
     def predict(self, observation: Any, deterministic: bool) -> np.ndarray:
+        policy_observation = self.policy_observation(observation)
         with self.policy_lock:
             action, _ = self.policy.predict(
-                observation,
+                policy_observation,
                 deterministic=deterministic,
             )
         return np.asarray(action, dtype=float)
+
+    def policy_observation(self, observation: Any) -> np.ndarray:
+        raw_observation = np.asarray(observation, dtype=np.float32).reshape(-1)
+        expected_dim = int(self.metadata.get("observationDim") or 0)
+        if expected_dim and raw_observation.shape[0] != expected_dim:
+            projected = legacy_policy_observation(raw_observation, expected_dim)
+            if projected is not None:
+                return projected
+        return raw_observation
 
 
 class LiveSimulationService:
@@ -156,6 +175,8 @@ class LiveSimulationService:
 
     def _resolve_env_kwargs(self, model_path: Path) -> dict[str, Any]:
         env_kwargs = dict(self.resolve_env_kwargs_for_model(model_path))
+        summary = read_json(training_summary_path(model_path, infer_run_name(model_path)))
+        env_kwargs = env_kwargs_with_summary_hints(env_kwargs, summary)
         env_kwargs["scene_path"] = str(self.settings.scene_path)
         env_kwargs["max_episode_steps"] = 0
         return self._supported_env_kwargs(env_kwargs)
@@ -483,7 +504,7 @@ class LiveSimulationSession:
 
     def _validate_observation_shape(self) -> None:
         expected_observation_dim = int(self.runtime.metadata.get("observationDim") or 0)
-        actual_observation_dim = int(np.asarray(self.observation).reshape(-1).shape[0])
+        actual_observation_dim = int(self.runtime.policy_observation(self.observation).shape[0])
         if expected_observation_dim and expected_observation_dim != actual_observation_dim:
             raise ValueError(
                 "Model/runtime observation shape mismatch: "
@@ -616,6 +637,16 @@ def action_space_dim(action_space: Any) -> int | None:
         return int(shape[0])
     if isinstance(shape, list) and shape:
         return int(shape[0])
+    return None
+
+
+def legacy_policy_observation(observation: np.ndarray, expected_dim: int) -> np.ndarray | None:
+    if observation.shape[0] < 35:
+        return None
+    if expected_dim == 29:
+        return np.concatenate((observation[:17], observation[20:32])).astype(np.float32, copy=False)
+    if expected_dim == 26:
+        return np.concatenate((observation[:17], observation[20:29])).astype(np.float32, copy=False)
     return None
 
 

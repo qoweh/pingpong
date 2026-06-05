@@ -29,16 +29,35 @@ CATALOG_EXCLUDED_RUN_NAMES = {
     "pmk_cf_self_rally_v29_first_contact_chase_sector",
 }
 CATALOG_EXCLUDED_ACTION_DIMS = {19}
-CATALOG_VISIBLE_RUN_NAMES = {
-    "keep_v39_17d",
-    "keep1_v38_17d_mid_curriculum_recover",
-    "keep1_v37_17d_wide_curriculum_guarded",
-    "keep1_v30",
-    "pmk_cf_self_rally_v27_fast",
-    "pmk_cf_self_rally_v18",
-    "pmk_cf_self_rally_v17",
-    "pmk_cf_self_rally_v16",
-    "pmk_cf_self_rally_v5",
+SUMMARY_ENV_HINT_KEYS = {
+    "action_mode",
+    "action_limit",
+    "lateral_action_limit",
+    "vertical_action_limit",
+    "tilt_action_limit",
+    "followup_lift_action_limit",
+    "success_velocity_threshold",
+    "ball_height",
+    "target_ball_height",
+    "height_tolerance",
+    "reset_ball_height_range",
+    "reset_ball_height_bounds",
+    "reset_xy_range",
+    "reset_xy_sampling",
+    "reset_velocity_xy_range",
+    "reset_velocity_z_range",
+    "reset_ball_angular_velocity_range",
+    "target_offset_low",
+    "target_offset_high",
+    "target_tilt_limit",
+    "target_pitch_range",
+    "initial_target_tilt",
+}
+SUMMARY_ENV_KEY_ALIASES = {
+    "position_gain": "controller_position_gain",
+    "orientation_gain": "controller_orientation_gain",
+    "max_position_step": "controller_max_position_step",
+    "max_orientation_step": "controller_max_orientation_step",
 }
 
 
@@ -110,7 +129,7 @@ def build_model_record(
     zip_metadata = read_sb3_zip_metadata(model_path)
     summary_path = training_summary_path(model_path, raw_run_name)
     summary = read_json(summary_path)
-    env_kwargs = resolve_env_kwargs(model_path)
+    env_kwargs = env_kwargs_with_summary_hints(resolve_env_kwargs(model_path), summary)
     ball_spawn = build_ball_spawn_config(env_kwargs, model_path)
 
     observation_dim = read_shape_dim(zip_metadata.get("observation_space"))
@@ -200,7 +219,29 @@ def assign_dimension_versions(records: dict[str, ModelRecord]) -> dict[str, Mode
             )
 
     ordered = sorted(assigned, key=assigned_record_sort_key)
-    return {record.id: record for record in ordered}
+    latest_by_dimension: dict[str, int] = {}
+    for record in ordered:
+        group = str(record.metadata.get("dimensionGroup") or "")
+        latest_by_dimension[group] = max(latest_by_dimension.get(group, 0), int(record.metadata.get("sortVersion") or 0))
+
+    visible_ordered = []
+    for record in ordered:
+        group = str(record.metadata.get("dimensionGroup") or "")
+        metadata = {
+            **record.metadata,
+            "catalogVisible": int(record.metadata.get("sortVersion") or 0) == latest_by_dimension.get(group, 0),
+        }
+        visible_ordered.append(
+            ModelRecord(
+                id=record.id,
+                name=record.name,
+                display_name=record.display_name,
+                source=record.source,
+                path=record.path,
+                metadata=metadata,
+            )
+        )
+    return {record.id: record for record in visible_ordered}
 
 
 def with_loaded_policy_metadata(metadata: dict[str, Any], policy: Any) -> dict[str, Any]:
@@ -279,6 +320,41 @@ def summary_value(summary: dict[str, Any] | None, key: str) -> Any:
     if isinstance(config, dict) and key in config:
         return config[key]
     return summary.get(key)
+
+
+def env_kwargs_with_summary_hints(env_kwargs: dict[str, Any], summary: dict[str, Any] | None) -> dict[str, Any]:
+    if summary is None:
+        return dict(env_kwargs)
+
+    merged = dict(env_kwargs)
+    for container in summary_env_hint_containers(summary):
+        if not isinstance(container, dict):
+            continue
+        for key in SUMMARY_ENV_HINT_KEYS:
+            if key in container:
+                merged[key] = container[key]
+        for source_key, target_key in SUMMARY_ENV_KEY_ALIASES.items():
+            if source_key in container:
+                merged[target_key] = container[source_key]
+    return merged
+
+
+def summary_env_hint_containers(summary: dict[str, Any]) -> list[Any]:
+    containers: list[Any] = []
+    config = summary.get("config")
+    if isinstance(config, dict):
+        containers.append(config)
+        effective_env = config.get("effective_env")
+        if isinstance(effective_env, dict):
+            containers.extend(
+                [
+                    effective_env.get("core"),
+                    effective_env.get("reset_randomization"),
+                    effective_env.get("controller"),
+                ]
+            )
+    containers.extend([summary.get("env_config"), summary])
+    return containers
 
 
 def policy_metadata(zip_metadata: dict[str, Any], observation_dim: int | None, action_dim: int | None) -> dict[str, Any]:
@@ -534,8 +610,7 @@ def assigned_record_sort_key(record: ModelRecord) -> tuple[int, int, str]:
 
 
 def is_catalog_visible(record: ModelRecord) -> bool:
-    raw_run_name = str(record.metadata.get("rawRunName") or record.id)
-    return raw_run_name in CATALOG_VISIBLE_RUN_NAMES
+    return bool(record.metadata.get("catalogVisible"))
 
 
 def sort_dimension_value(value: Any) -> int:
