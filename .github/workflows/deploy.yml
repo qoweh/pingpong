@@ -11,9 +11,11 @@ jobs:
 
     steps:
       - name: Deploy
+        shell: bash
         run: |
           cd /home/pilt/pingpong
           git fetch origin
           git reset --hard origin/main
+          bash deploy/preflight.sh
           docker compose build --quiet
           docker compose up -d --force-recreate

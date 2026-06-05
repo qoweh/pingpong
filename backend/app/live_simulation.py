@@ -32,7 +32,7 @@ class LiveSimulationService:
         self.env_class = PingPongKeepUpGymEnv
         self.env_kwargs = resolve_env_kwargs_for_model(settings.model_path)
         self.env_kwargs["scene_path"] = str(settings.scene_path)
-        self.policy = PPO.load(settings.model_path, device="cpu")
+        self.policy = PPO.load(str(settings.model_path), device="cpu")
         self.policy_lock = threading.Lock()
         self.policy_message = f"Model: {display_model_name(settings.model_path)}"
         self.control_dt = 0.02

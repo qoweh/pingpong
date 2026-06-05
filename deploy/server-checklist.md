@@ -15,6 +15,7 @@
 ## 배포 절차
 
 ```sh
+bash deploy/preflight.sh
 docker compose build
 docker compose up -d
 curl http://localhost:8079/api/health
@@ -32,8 +33,29 @@ DOCKER_DEFAULT_PLATFORM=linux/amd64 docker compose build
 
 ## 배포 전 확인
 
+- `bash deploy/preflight.sh`가 통과하는지 확인한다.
 - `.env`의 `PINGPONG_POLICY_MODEL_PATH`가 서버에 존재하는 파일을 가리키는지 확인한다.
 - `rl/assets/scene.xml`과 Franka mesh 파일이 있는지 확인한다.
 - `frontend/public/assets/mujoco/pingpong_scene.mjb`가 현재 scene과 맞는지 확인한다.
 - `/api/live` WebSocket이 proxy에서 차단되지 않는지 확인한다.
 - 첫 접속 속도를 위해 `.js`, `.css`, `.wasm`, `.mjb` 파일에 gzip 또는 Brotli 압축을 적용한다.
+
+## 자주 나는 배포 오류
+
+### 모델 zip 누락
+
+서버 로그에 다음과 비슷한 오류가 보이면 모델 파일이 컨테이너 안에 들어가지 않은 상태다.
+
+```text
+FileNotFoundError: ... keep_v39_17d_model.zip.zip
+```
+
+Stable-Baselines3가 없는 모델 파일을 찾으면서 `.zip` 후보를 한 번 더 붙여 표시할 수 있다. 실제로 확인해야 하는 파일은 `.env`에 적은 `PINGPONG_POLICY_MODEL_PATH`다.
+
+기본 설정이라면 서버 작업 디렉토리에 아래 파일이 있어야 한다.
+
+```text
+rl/artifacts/keep_v39_17d/keep_v39_17d_model.zip
+```
+
+Dockerfile은 build 시점의 `./rl`을 이미지에 복사한다. 따라서 `rl/assets`와 필요한 모델 zip은 `docker compose build` 전에 서버 작업 디렉토리에 준비되어 있어야 한다.

@@ -30,6 +30,14 @@ PINGPONG_LIVE_SEED=251
 
 새 모델을 사용할 때는 모델 zip과 training summary를 `rl/artifacts/<run_name>/`에 배치하고 `PINGPONG_POLICY_MODEL_PATH`만 바꾼다.
 
+배포 전에 런타임 파일이 모두 있는지 확인한다.
+
+```sh
+bash deploy/preflight.sh
+```
+
+`Policy model is missing` 오류가 나면 `.env`의 `PINGPONG_POLICY_MODEL_PATH`가 서버 작업 디렉토리 안에 실제로 존재하는지 확인한다. Stable-Baselines3는 zip이 없을 때 내부적으로 `.zip` 후보를 덧붙일 수 있어서 로그에 `.zip.zip`처럼 보일 수 있지만, 실제 원인은 지정한 모델 zip이 없다는 뜻이다.
+
 ## 로컬 실행
 
 프론트엔드 개발 서버:
