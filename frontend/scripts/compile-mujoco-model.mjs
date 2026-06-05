@@ -26,7 +26,8 @@ const mujoco = await loadMujoco({
 });
 
 const vfs = new mujoco.MjVFS();
-for (const file of listFiles(sourceRoot)) {
+const sourceFiles = listFiles(sourceRoot);
+for (const file of sourceFiles) {
   vfs.addBuffer(file, fs.readFileSync(path.join(sourceRoot, file)));
 }
 
@@ -39,7 +40,11 @@ const nextManifest = {
   modelRoot: "/assets/mujoco",
   scene: outputScene,
   sceneFormat: "mjb",
-  files: [outputScene]
+  files: [outputScene],
+  fallbackModelRoot: "/runtime-mujoco-assets",
+  fallbackScene: sourceScene,
+  fallbackSceneFormat: "xml",
+  fallbackFiles: sourceFiles
 };
 fs.writeFileSync(manifestPath, `${JSON.stringify(nextManifest, null, 2)}\n`);
 

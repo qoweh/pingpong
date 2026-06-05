@@ -107,7 +107,7 @@ export function App() {
           throw new Error("Model response was not readable.");
         }
         applyModelsPayload(parsed);
-        setSnapshot({ ...ZERO_SNAPSHOT, policyMessage: "Connecting to control model" });
+        setSnapshot({ ...ZERO_SNAPSHOT, policyMessage: "Connecting to policy model" });
         setCanvasKey((key) => key + 1);
         setPlayback("playing");
       } catch (error) {

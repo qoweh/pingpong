@@ -262,6 +262,11 @@ button {
   line-height: 1.4;
 }
 
+.loading-steps span {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
 .loading-steps .done {
   color: #e8fff8;
 }

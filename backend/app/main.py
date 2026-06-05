@@ -128,6 +128,10 @@ async def receive_commands(websocket: WebSocket, state: LiveCommandState, ball_s
 
 
 frontend_dist = settings.frontend_dist
+runtime_mujoco_assets = settings.project_root / "rl" / "assets"
+if runtime_mujoco_assets.exists():
+    app.mount("/runtime-mujoco-assets", StaticFiles(directory=runtime_mujoco_assets), name="runtime-mujoco-assets")
+
 if frontend_dist.exists():
     assets_dir = frontend_dist / "assets"
     if assets_dir.exists():

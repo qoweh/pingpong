@@ -48,7 +48,7 @@ export class DemoController {
       this.world.setPlayback(this.playback);
       this.reportProgress(90, "Preparing viewer");
       this.renderer.loadWorld(this.world);
-      this.reportProgress(94, "Waiting for control model");
+      this.reportProgress(94, "Waiting for policy model");
       this.emit(true);
       this.loop(0);
     } catch (error) {

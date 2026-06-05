@@ -17,8 +17,8 @@ export function ActionVisualizer({ action, model }: ActionVisualizerProps) {
   return (
     <div className="control-section action-visualizer">
       <div className="section-heading">
-        <h2>PPO Action</h2>
-        <span>{actionDim}D</span>
+        <h2>Policy Output</h2>
+        <span>{actionDim} controls</span>
       </div>
       <div className="action-bar-list">
         {values.map((value, index) => {
@@ -53,7 +53,7 @@ export function ActionVisualizer({ action, model }: ActionVisualizerProps) {
 function labelsFor(model: ModelMetadata | null, actionDim: number): string[] {
   const labels = model?.actionLabels?.length ? [...model.actionLabels] : [];
   while (labels.length < actionDim) {
-    labels.push(`Action[${labels.length}]`);
+    labels.push(`Control ${labels.length + 1}`);
   }
   return labels.slice(0, actionDim);
 }

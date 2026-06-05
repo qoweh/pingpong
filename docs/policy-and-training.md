@@ -150,8 +150,11 @@ MuJoCo state
   "models": [
     {
       "id": "keep_v39_17d",
-      "name": "keep_v39_17d",
-      "displayName": "V39 17D Current",
+      "name": "17D V11",
+      "displayName": "17D V11 · Current v39",
+      "rawRunName": "keep_v39_17d",
+      "dimensionGroup": "17D",
+      "versionLabel": "V11",
       "algorithm": "PPO",
       "observationDim": 55,
       "actionDim": 17,
@@ -161,9 +164,9 @@ MuJoCo state
 }
 ```
 
-`rl1`, `rl2`, `rl3`처럼 실험 시점별로 나뉜 legacy run은 사람이 읽기 쉬운 짧은 이름으로 표시한다. 예를 들어 `keep1_v36_17d_balanced_xyz012`는 `V36 17D Balanced`처럼 보인다.
+`rl1`, `rl2`, `rl3`처럼 실험 시점별로 나뉜 legacy run은 action dimension별로 묶고, 같은 dimension 안에서는 오래된 run부터 `V1`, `V2`를 부여한다. UI에서는 가장 최신 버전이 위에 오므로 예를 들어 `keep1_v36_17d_balanced_xyz012`는 `17D V8 · Keep-up v36 Balanced`처럼 보이고, 원본 run 이름은 `rawRunName`으로 남긴다.
 
-## PPO/action 시각화
+## Policy output/action 시각화
 
 프레임 payload에는 서버 PPO가 실제로 낸 `action` 배열과 `modelId`가 포함된다. 프론트엔드는 선택된 모델의 `actionDim`과 `actionLabels`를 기준으로 action bar를 동적으로 생성한다.
 
@@ -174,7 +177,7 @@ MuJoCo state
 | 17D | 17개 action bar |
 | 새 차원 | metadata의 `actionDim`만 맞으면 같은 컴포넌트로 표시 |
 
-Action label은 training summary에 명시된 값이 있으면 우선 사용하고, 없으면 action mode 기반 라벨을 생성한다. 둘 다 없거나 차원이 맞지 않으면 `Action[0]`, `Action[1]` 형태로 채운다. Policy 구조는 SB3 policy 객체에서 linear layer를 읽을 수 있으면 `Input -> Dense -> Actor/Critic Head` 형태로 표시하고, 추출이 제한되면 observation/action dim과 policy class를 표시한다.
+Action label은 training summary에 명시된 값이 있으면 우선 사용하고, 없으면 action mode 기반 라벨을 생성한다. 둘 다 없거나 차원이 맞지 않으면 `Control 1`, `Control 2` 형태로 채운다. Policy 구조는 SB3 policy 객체에서 linear layer를 읽을 수 있으면 `Observation input -> Hidden layer -> Policy output -> Value estimate` 형태로 표시한다. 여기서 hidden layer는 Stable-Baselines3 policy 안의 fully connected layer이며, `64 units`가 두 번 보이면 64-unit hidden layer가 2개 연속으로 있다는 뜻이다.
 
 ## 추가 학습 명령어
 

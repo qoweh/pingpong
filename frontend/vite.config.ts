@@ -13,6 +13,10 @@ export default defineConfig({
         target: "http://localhost:8079",
         changeOrigin: true,
         ws: true
+      },
+      "/runtime-mujoco-assets": {
+        target: "http://localhost:8079",
+        changeOrigin: true
       }
     }
   }

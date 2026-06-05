@@ -60,6 +60,12 @@ export interface ModelMetadata {
   id: string;
   name: string;
   displayName: string;
+  rawRunName?: string | null;
+  dimensionGroup?: string | null;
+  versionLabel?: string | null;
+  detailName?: string | null;
+  sortDimension?: number | null;
+  sortVersion?: number | null;
   source: string;
   path: string;
   algorithm: string;
@@ -182,7 +188,7 @@ export const ZERO_SNAPSHOT: SimulationSnapshot = {
   truncated: false,
   mujocoLoaded: false,
   policyLoaded: false,
-  policyMessage: "Connecting to control model",
+  policyMessage: "Connecting to policy model",
   modelId: null,
   action: null
 };

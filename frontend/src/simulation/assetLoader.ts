@@ -5,6 +5,10 @@ export interface MujocoAssetManifest {
   sceneFormat?: "xml" | "mjb";
   sourceScene?: string;
   sourceFiles?: string[];
+  fallbackModelRoot?: string;
+  fallbackScene?: string;
+  fallbackSceneFormat?: "xml" | "mjb";
+  fallbackFiles?: string[];
 }
 
 export interface AssetLoadProgress {
@@ -18,7 +22,7 @@ const ASSET_FETCH_CONCURRENCY = 8;
 export async function loadAssetManifest(): Promise<MujocoAssetManifest> {
   const response = await fetch("/assets/mujoco/asset-manifest.json");
   if (!response.ok) {
-    throw new Error(`Failed to load simulation asset list: ${response.status}`);
+    throw new Error(`The 3D scene asset list could not be loaded from the server. HTTP ${response.status}.`);
   }
 
   return (await response.json()) as MujocoAssetManifest;
@@ -50,7 +54,7 @@ export async function loadMujocoAssets(
 export async function fetchAssetBytes(assetPath: string): Promise<Uint8Array> {
   const response = await fetch(assetPath, { cache: "force-cache" });
   if (!response.ok) {
-    throw new Error(`Failed to load simulation asset ${assetPath}: ${response.status}`);
+    throw new Error(`A 3D scene asset could not be downloaded. ${assetPath} returned HTTP ${response.status}.`);
   }
 
   return new Uint8Array(await response.arrayBuffer());

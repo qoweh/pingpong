@@ -1,6 +1,7 @@
 import type { MainModule, MjData, MjModel, MjVFS } from "@mujoco/mujoco";
 
 import { loadMujocoAssets, loadAssetManifest } from "./assetLoader";
+import type { MujocoAssetManifest } from "./assetLoader";
 import { loadMujocoModule } from "./mujocoLoader";
 import type {
   BallSpawnSettings,
@@ -17,6 +18,7 @@ const MODEL_FS_ROOT = "/pingpong_model";
 const BALL_BODY_NAME = "ball";
 const BALL_JOINT_NAME = "ball_joint";
 const RACKET_SITE_NAME = "racket_center";
+type SceneFormat = "xml" | "mjb";
 
 type MujocoIds = {
   ballBody: number;
@@ -63,6 +65,12 @@ type LiveMessage =
     };
 
 type LoadingProgressListener = (progress: LoadingProgress) => void;
+type FallbackScene = {
+  modelRoot: string;
+  scene: string;
+  sceneFormat: SceneFormat;
+  files: string[];
+};
 
 export class MujocoWorld {
   private module: MainModule | null = null;
@@ -89,19 +97,19 @@ export class MujocoWorld {
   private fallbackBallPosition: Vec3 = [...ZERO_SNAPSHOT.ball.position] as Vec3;
   private fallbackBallVelocity: Vec3 = [0, 0, 0];
   private racketAnchor: Vec3 = [...ZERO_SNAPSHOT.racketPosition] as Vec3;
-  private policyMessage = "Connecting to control model";
+  private policyMessage = "Connecting to policy model";
   private liveModelId: string | null = null;
   private latestAction: number[] | null = null;
 
   async initialize(onProgress?: LoadingProgressListener): Promise<void> {
-    notifyProgress(onProgress, 6, "Loading simulation engine");
+    notifyProgress(onProgress, 6, "Loading MuJoCo physics engine");
     const [module, manifest] = await Promise.all([
       loadMujocoModule().then((loadedModule) => {
-        notifyProgress(onProgress, 34, "Simulation engine loaded");
+        notifyProgress(onProgress, 34, "MuJoCo physics engine loaded");
         return loadedModule;
       }),
       loadAssetManifest().then((loadedManifest) => {
-        notifyProgress(onProgress, 12, "Loading scene assets");
+        notifyProgress(onProgress, 12, "Loading 3D scene asset list");
         return loadedManifest;
       })
     ]);
@@ -111,26 +119,16 @@ export class MujocoWorld {
 
     const modelRoot = manifest.modelRoot || MODEL_ROOT;
 
-    notifyProgress(onProgress, 38, "Loading scene assets");
+    notifyProgress(onProgress, 38, "Loading compiled 3D scene");
     this.ensureVirtualDirectory(MODEL_FS_ROOT);
-    await loadMujocoAssets(
-      manifest.files,
-      modelRoot,
-      (file, bytes) => {
-        this.writeVirtualFile(`${MODEL_FS_ROOT}/${file}`, bytes);
-      },
-      ({ loaded, total }) => {
-        const assetProgress = total > 0 ? loaded / total : 1;
-        notifyProgress(onProgress, 38 + assetProgress * 36, `Loading scene assets ${loaded}/${total}`);
-      }
-    );
+    await this.loadSceneAssets(manifest.files, modelRoot, onProgress, 38, 36, "Loading compiled 3D scene");
 
-    notifyProgress(onProgress, 78, "Building simulation scene");
-    this.model = this.loadModel(module, `${MODEL_FS_ROOT}/${manifest.scene}`, manifest.sceneFormat);
+    notifyProgress(onProgress, 78, "Opening 3D physics scene");
+    this.model = await this.openModelWithFallback(module, manifest, onProgress);
     this.data = new module.MjData(this.model);
     this.ids = this.resolveIds(module, this.model);
     this.resetLocalState();
-    notifyProgress(onProgress, 86, "Connecting control model");
+    notifyProgress(onProgress, 86, "Connecting policy model");
     this.connectLiveBackend();
   }
 
@@ -231,7 +229,7 @@ export class MujocoWorld {
 
     this.socket.addEventListener("open", () => {
       this.liveConnected = true;
-      this.policyMessage = "Connecting to control model";
+      this.policyMessage = "Connecting to policy model";
       this.sendCommand({ type: "playback", playback: this.playback });
       this.flushPendingSpawn();
     });
@@ -244,7 +242,7 @@ export class MujocoWorld {
 
       if (message.type === "ready") {
         this.liveReady = true;
-        this.policyMessage = "Control model ready";
+        this.policyMessage = "Policy model ready";
         return;
       }
 
@@ -256,12 +254,12 @@ export class MujocoWorld {
     this.socket.addEventListener("close", () => {
       this.liveConnected = false;
       this.liveReady = false;
-      this.policyMessage = "Control stream disconnected";
+      this.policyMessage = "Live policy stream disconnected. Refresh if it does not reconnect.";
     });
 
     this.socket.addEventListener("error", () => {
       this.liveConnected = false;
-      this.policyMessage = "Control stream connection failed";
+      this.policyMessage = "Could not connect to the live policy stream.";
     });
   }
 
@@ -304,7 +302,7 @@ export class MujocoWorld {
       frame.state.qvel.length !== this.model.nv ||
       frame.state.ctrl.length !== this.model.nu
     ) {
-      this.policyMessage = "Control stream does not match the loaded simulation scene.";
+      this.policyMessage = "The server simulation and browser 3D scene are out of sync. Rebuild the web MuJoCo scene asset and refresh.";
       return;
     }
 
@@ -364,9 +362,56 @@ export class MujocoWorld {
     this.resetSerial += 1;
   }
 
-  private loadModel(module: MainModule, scene: string, sceneFormat?: "xml" | "mjb"): MjModel {
+  private async openModelWithFallback(
+    module: MainModule,
+    manifest: MujocoAssetManifest,
+    onProgress?: LoadingProgressListener
+  ): Promise<MjModel> {
+    try {
+      return this.loadModel(module, `${MODEL_FS_ROOT}/${manifest.scene}`, manifest.sceneFormat);
+    } catch (primaryError) {
+      const fallback = fallbackScene(manifest);
+      if (!fallback) {
+        throw new Error(formatMujocoModelLoadError(primaryError, manifest.scene, manifest.sceneFormat));
+      }
+
+      notifyProgress(onProgress, 80, "Compiled scene did not open; loading source scene");
+      await this.loadSceneAssets(fallback.files, fallback.modelRoot, onProgress, 80, 5, "Loading source 3D scene");
+      try {
+        notifyProgress(onProgress, 85, "Opening source 3D scene");
+        return this.loadModel(module, `${MODEL_FS_ROOT}/${fallback.scene}`, fallback.sceneFormat);
+      } catch (fallbackError) {
+        throw new Error(
+          formatMujocoModelLoadError(primaryError, manifest.scene, manifest.sceneFormat, fallbackError, fallback.scene)
+        );
+      }
+    }
+  }
+
+  private async loadSceneAssets(
+    files: string[],
+    modelRoot: string,
+    onProgress: LoadingProgressListener | undefined,
+    progressStart: number,
+    progressSpan: number,
+    label: string
+  ): Promise<void> {
+    await loadMujocoAssets(
+      files,
+      modelRoot,
+      (file, bytes) => {
+        this.writeVirtualFile(`${MODEL_FS_ROOT}/${file}`, bytes);
+      },
+      ({ loaded, total }) => {
+        const assetProgress = total > 0 ? loaded / total : 1;
+        notifyProgress(onProgress, progressStart + assetProgress * progressSpan, `${label} ${loaded}/${total}`);
+      }
+    );
+  }
+
+  private loadModel(module: MainModule, scene: string, sceneFormat?: SceneFormat): MjModel {
     if (!this.vfs) {
-      throw new Error("Simulation assets are not initialized.");
+      throw new Error("3D scene files are not ready yet.");
     }
 
     const format = sceneFormat ?? (scene.endsWith(".mjb") ? "mjb" : "xml");
@@ -405,7 +450,7 @@ export class MujocoWorld {
     const racketSite = module.mj_name2id(model, module.mjtObj.mjOBJ_SITE.value, RACKET_SITE_NAME);
 
     if ([ballBody, ballJoint, racketSite].some((id) => id < 0)) {
-      throw new Error("Simulation scene is missing required ball or paddle markers.");
+      throw new Error("The 3D scene is missing required ball or racket markers. Rebuild the MuJoCo scene asset from rl/assets/scene.xml.");
     }
 
     return {
@@ -525,6 +570,63 @@ function parseLiveMessage(rawData: unknown): LiveMessage | null {
   } catch {
     return null;
   }
+}
+
+function fallbackScene(manifest: MujocoAssetManifest): FallbackScene | null {
+  const scene = manifest.fallbackScene ?? manifest.sourceScene;
+  const files = manifest.fallbackFiles ?? manifest.sourceFiles;
+  if (!scene || !files?.length) {
+    return null;
+  }
+
+  const uniqueFiles = Array.from(new Set([scene, ...files]));
+  const sceneFormat = manifest.fallbackSceneFormat ?? (scene.endsWith(".mjb") ? "mjb" : "xml");
+  return {
+    modelRoot: manifest.fallbackModelRoot ?? manifest.modelRoot ?? MODEL_ROOT,
+    scene,
+    sceneFormat,
+    files: uniqueFiles
+  };
+}
+
+function formatMujocoModelLoadError(
+  primaryError: unknown,
+  scene: string,
+  sceneFormat?: SceneFormat,
+  fallbackError?: unknown,
+  fallbackSceneName?: string
+): string {
+  const format = sceneFormat ?? (scene.endsWith(".mjb") ? "mjb" : "xml");
+  const primaryDetail = compactErrorMessage(primaryError);
+
+  if (fallbackError) {
+    return (
+      "The browser could not open the 3D physics scene. " +
+      `The compiled scene (${scene}) failed first, and the source scene fallback (${fallbackSceneName ?? "scene.xml"}) failed too. ` +
+      "Refresh once; if it keeps happening, rebuild the web MuJoCo scene asset with npm run compile:mujoco and redeploy. " +
+      `Details: compiled scene: ${primaryDetail}; source scene: ${compactErrorMessage(fallbackError)}`
+    );
+  }
+
+  if (format === "mjb") {
+    return (
+      `The compiled 3D scene file (${scene}) could not be opened. ` +
+      "MJB is MuJoCo's precompiled binary scene format. " +
+      "Refresh once; if it keeps happening, rebuild the web scene asset with npm run compile:mujoco and redeploy. " +
+      `Detail: ${primaryDetail}`
+    );
+  }
+
+  return (
+    `The source 3D scene file (${scene}) could not be opened. ` +
+    "Check that rl/assets/scene.xml and its mesh files are present on the server, then refresh. " +
+    `Detail: ${primaryDetail}`
+  );
+}
+
+function compactErrorMessage(error: unknown): string {
+  const message = error instanceof Error ? error.message : String(error);
+  return message.replace(/\s+/g, " ").trim() || "unknown error";
 }
 
 function arrayVec3(arrayLike: ArrayLike<number>, offset: number): Vec3 {

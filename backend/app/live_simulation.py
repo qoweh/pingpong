@@ -421,8 +421,15 @@ def tested_ranges(ball_spawn_config: dict[str, Any]) -> dict[str, dict[str, floa
     }
 
 
-def model_sort_key(model: dict[str, Any], active_model_id: str) -> tuple[int, str, str]:
+def model_sort_key(model: dict[str, Any], active_model_id: str) -> tuple[int, int, int, str]:
     model_id = str(model.get("id") or "")
-    source = str(model.get("source") or "")
     name = str(model.get("displayName") or model.get("name") or model_id)
-    return (0 if model_id == active_model_id else 1, source, name)
+    dimension = model.get("sortDimension")
+    version = model.get("sortVersion")
+    active_rank = 0 if str(model.get("id") or "") == active_model_id else 1
+    return (
+        -int(dimension) if isinstance(dimension, int) else 1,
+        -int(version) if isinstance(version, int) else 0,
+        active_rank,
+        name,
+    )

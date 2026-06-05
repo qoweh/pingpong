@@ -38,7 +38,7 @@ def build_model_catalog(
         records[record.id] = record
         used_ids.add(record.id)
 
-    return records
+    return assign_dimension_versions(records)
 
 
 def representative_model_paths(artifacts_root: Path) -> dict[Path, Path]:
@@ -85,7 +85,9 @@ def build_model_record(
     action_low = parse_space_bounds(zip_metadata.get("action_space"), "low_repr")
     action_high = parse_space_bounds(zip_metadata.get("action_space"), "high_repr")
     action_mode = str(env_kwargs.get("action_mode") or summary_value(summary, "action_mode") or "position")
-    public_name = public_model_name(raw_run_name, action_dim)
+    dimension_group = dimension_group_label(action_dim)
+    detail_name = compact_model_detail(raw_run_name, model_path)
+    public_name = raw_run_name
     model_id = unique_id(raw_run_name, used_ids)
 
     labels = normalized_action_labels(summary_action_labels(summary), action_mode, action_dim)
@@ -93,7 +95,11 @@ def build_model_record(
     metadata = {
         "id": model_id,
         "name": public_name,
-        "displayName": display_model_name(raw_run_name, action_dim, model_path),
+        "displayName": f"{dimension_group} · {detail_name}",
+        "rawRunName": raw_run_name,
+        "dimensionGroup": dimension_group,
+        "versionLabel": None,
+        "detailName": detail_name,
         "source": model_source(model_path),
         "path": portable_path(model_path, project_root),
         "algorithm": "PPO",
@@ -119,6 +125,44 @@ def build_model_record(
         path=model_path.resolve(),
         metadata=metadata,
     )
+
+
+def assign_dimension_versions(records: dict[str, ModelRecord]) -> dict[str, ModelRecord]:
+    grouped: dict[str, list[ModelRecord]] = {}
+    for record in records.values():
+        group = str(record.metadata.get("dimensionGroup") or dimension_group_label(record.metadata.get("actionDim")))
+        grouped.setdefault(group, []).append(record)
+
+    assigned: list[ModelRecord] = []
+    for group, group_records in grouped.items():
+        chronological = sorted(group_records, key=model_chronology_key)
+        for version_number, record in enumerate(chronological, start=1):
+            version_label = f"V{version_number}"
+            detail_name = str(record.metadata.get("detailName") or record.metadata.get("rawRunName") or record.id)
+            public_name = f"{group} {version_label}"
+            display_name = f"{public_name} · {detail_name}"
+            metadata = {
+                **record.metadata,
+                "name": public_name,
+                "displayName": display_name,
+                "dimensionGroup": group,
+                "versionLabel": version_label,
+                "sortDimension": sort_dimension_value(record.metadata.get("actionDim")),
+                "sortVersion": version_number,
+            }
+            assigned.append(
+                ModelRecord(
+                    id=record.id,
+                    name=public_name,
+                    display_name=display_name,
+                    source=record.source,
+                    path=record.path,
+                    metadata=metadata,
+                )
+            )
+
+    ordered = sorted(assigned, key=assigned_record_sort_key)
+    return {record.id: record for record in ordered}
 
 
 def with_loaded_policy_metadata(metadata: dict[str, Any], policy: Any) -> dict[str, Any]:
@@ -224,10 +268,10 @@ def loaded_policy_architecture(policy: Any, observation_dim: int, action_dim: in
     layers = linear_layer_widths(getattr(extractor, "policy_net", None))
     if not layers:
         layers = linear_layer_widths(getattr(extractor, "shared_net", None))
-    lines = [f"Input ({observation_dim})"] if observation_dim else ["Input"]
-    lines.extend(f"Dense({width})" for width in layers)
-    lines.append(f"Actor Head ({action_dim})" if action_dim else "Actor Head")
-    lines.append("Critic Head (1)")
+    lines = observation_architecture_lines(observation_dim)
+    lines.extend(hidden_layer_line(index, width) for index, width in enumerate(layers, start=1))
+    lines.append(f"Policy output: {action_dim} controls" if action_dim else "Policy output")
+    lines.append("Value estimate: 1 number")
     return lines
 
 
@@ -247,21 +291,30 @@ def default_policy_architecture(
     class_name: str | None,
     net_arch: Any,
 ) -> list[str]:
-    lines = [f"Input ({observation_dim})" if observation_dim else "Input"]
+    lines = observation_architecture_lines(observation_dim)
     if isinstance(net_arch, list):
-        lines.extend(f"Dense({value})" for value in net_arch if isinstance(value, int))
+        widths = [value for value in net_arch if isinstance(value, int)]
+        lines.extend(hidden_layer_line(index, width) for index, width in enumerate(widths, start=1))
     elif isinstance(net_arch, dict):
         pi_layers = net_arch.get("pi")
         vf_layers = net_arch.get("vf")
         if isinstance(pi_layers, list):
-            lines.extend(f"Actor Dense({value})" for value in pi_layers if isinstance(value, int))
+            lines.extend(f"Policy hidden {index}: {value} units" for index, value in enumerate(pi_layers, start=1) if isinstance(value, int))
         if isinstance(vf_layers, list):
-            lines.extend(f"Critic Dense({value})" for value in vf_layers if isinstance(value, int))
+            lines.extend(f"Value hidden {index}: {value} units" for index, value in enumerate(vf_layers, start=1) if isinstance(value, int))
     elif class_name:
         lines.append(class_name)
-    lines.append(f"Actor Head ({action_dim})" if action_dim else "Actor Head")
-    lines.append("Critic Head (1)")
+    lines.append(f"Policy output: {action_dim} controls" if action_dim else "Policy output")
+    lines.append("Value estimate: 1 number")
     return lines
+
+
+def observation_architecture_lines(observation_dim: int | None) -> list[str]:
+    return [f"Observation input: {observation_dim} values"] if observation_dim else ["Observation input"]
+
+
+def hidden_layer_line(index: int, width: int) -> str:
+    return f"Hidden layer {index}: {width} units"
 
 
 def action_labels(action_mode: str, action_dim: int | None) -> list[str]:
@@ -270,7 +323,7 @@ def action_labels(action_mode: str, action_dim: int | None) -> list[str]:
 
     labels = labels_for_action_mode(action_mode)
     if len(labels) < action_dim:
-        labels.extend(f"Action[{index}]" for index in range(len(labels), action_dim))
+        labels.extend(f"Control {index + 1}" for index in range(len(labels), action_dim))
     return labels[:action_dim]
 
 
@@ -280,7 +333,7 @@ def normalized_action_labels(summary_labels: list[str] | None, action_mode: str,
     labels = list(summary_labels or [])
     fallback = action_labels(action_mode, action_dim)
     while len(labels) < action_dim:
-        labels.append(fallback[len(labels)] if len(labels) < len(fallback) else f"Action[{len(labels)}]")
+        labels.append(fallback[len(labels)] if len(labels) < len(fallback) else f"Control {len(labels) + 1}")
     return labels[:action_dim]
 
 
@@ -361,63 +414,144 @@ def training_metadata(summary: dict[str, Any] | None) -> dict[str, Any]:
     }
 
 
-def public_model_name(raw_run_name: str, action_dim: int | None) -> str:
-    dim = f"_{action_dim}d" if action_dim else ""
-    if raw_run_name.startswith("keep1_"):
-        stripped = raw_run_name.replace("keep1_", "keep_", 1)
-        match = re.match(r"(keep_v\d+(?:_\d+d)?)(?:_|$)", stripped)
-        return match.group(1) if match else stripped
-    if raw_run_name.startswith("pmk_cf_self_rally_"):
-        version = re.search(r"v\d+", raw_run_name)
-        return f"{version.group(0)}{dim}" if version else f"contact_frame{dim}"
-    if raw_run_name.startswith("ppo_keepup_"):
-        version = re.search(r"v\d+", raw_run_name)
-        return f"rl1_{version.group(0)}{dim}" if version else f"rl1{dim}"
-    return raw_run_name
+def dimension_group_label(action_dim: Any) -> str:
+    return f"{int(action_dim)}D" if isinstance(action_dim, int) and action_dim > 0 else "Unknown D"
 
 
-def display_model_name(raw_run_name: str, action_dim: int | None, model_path: Path) -> str:
-    dim = f"{action_dim}D" if action_dim else "PPO"
-    title_parts: list[str] = []
-    version = re.search(r"v\d+", raw_run_name)
+def compact_model_detail(raw_run_name: str, model_path: Path) -> str:
+    version = version_label_from_name(raw_run_name)
+    descriptors = descriptor_words(raw_run_name)
+
     if raw_run_name == "keep_v39_17d":
-        title_parts = ["V39", dim, "Current"]
-    elif raw_run_name.startswith("keep1_"):
-        title_parts = [version.group(0).upper() if version else "Keep", dim]
-        title_parts.extend(descriptor_words(raw_run_name))
+        parts = ["Current", version or "v39"]
+    elif raw_run_name.startswith(("keep1_", "keep_")):
+        parts = ["Keep-up"]
+        if version:
+            parts.append(version)
     elif raw_run_name.startswith("pmk_cf_self_rally_"):
-        title_parts = [version.group(0).upper() if version else "CF", dim]
-        title_parts.extend(descriptor_words(raw_run_name))
+        parts = ["Contact-frame"]
+        if "outward" in raw_run_name:
+            parts.append("Outward")
+        if version:
+            parts.append(version)
+    elif raw_run_name.startswith("pmk_cf_zero_init"):
+        parts = ["Zero-init eval"]
+        if version:
+            parts.append(version)
     elif raw_run_name.startswith("ppo_keepup_"):
-        title_parts = ["RL1", version.group(0).upper() if version else "KeepUp", dim]
-        title_parts.extend(descriptor_words(raw_run_name))
+        parts = ["Early keep-up"]
+        if version:
+            parts.append(version)
+    elif raw_run_name == "ppo_active_hit":
+        parts = ["Active hit"]
+    elif raw_run_name == "ppo_baseline":
+        parts = ["Baseline"]
     else:
-        title_parts = [raw_run_name, dim]
+        parts = [raw_run_name]
 
+    parts.extend(descriptors)
     if model_path.name.endswith("_best_model.zip"):
-        title_parts.append("Best")
-    return " ".join(part for part in title_parts if part)
+        parts.append("Best")
+    return title_detail(" ".join(unique_words(parts)))
+
+
+def unique_words(parts: list[str]) -> list[str]:
+    seen: set[str] = set()
+    unique: list[str] = []
+    for part in parts:
+        key = part.lower()
+        if not part or key in seen:
+            continue
+        seen.add(key)
+        unique.append(part)
+    return unique
+
+
+def title_detail(value: str) -> str:
+    return value[:1].upper() + value[1:] if value else value
+
+
+def version_label_from_name(raw_run_name: str) -> str | None:
+    version = re.search(r"v\d+", raw_run_name)
+    return version.group(0) if version else None
+
+
+def model_chronology_key(record: ModelRecord) -> tuple[int, int, float, str]:
+    raw_run_name = str(record.metadata.get("rawRunName") or record.id)
+    return (
+        version_number_from_name(raw_run_name),
+        source_generation_rank(str(record.metadata.get("source") or "")),
+        file_modified_time(record.path),
+        raw_run_name,
+    )
+
+
+def assigned_record_sort_key(record: ModelRecord) -> tuple[int, int, str]:
+    metadata = record.metadata
+    return (
+        -sort_dimension_value(metadata.get("actionDim")),
+        -int(metadata.get("sortVersion") or 0),
+        str(metadata.get("displayName") or record.display_name),
+    )
+
+
+def sort_dimension_value(value: Any) -> int:
+    return int(value) if isinstance(value, int) else -1
+
+
+def version_number_from_name(raw_run_name: str) -> int:
+    versions = [int(match) for match in re.findall(r"v(\d+)", raw_run_name)]
+    return max(versions) if versions else 0
+
+
+def source_generation_rank(source: str) -> int:
+    if source == "current":
+        return 99
+    match = re.fullmatch(r"rl(\d+)", source)
+    return int(match.group(1)) if match else 0
+
+
+def file_modified_time(path: Path) -> float:
+    try:
+        return path.stat().st_mtime
+    except OSError:
+        return 0.0
 
 
 def descriptor_words(raw_run_name: str) -> list[str]:
     descriptors: list[str] = []
     keywords = [
+        ("first_contact", "First Contact"),
+        ("racket_tracking", "Racket Tracking"),
+        ("robot_base", "Robot Base"),
         ("balanced", "Balanced"),
         ("tracking_spin", "Tracking Spin"),
         ("tracking_staged", "Tracking Staged"),
+        ("distribution", "Distribution"),
         ("strong_axis", "Strong Axis"),
+        ("stable", "Stable"),
+        ("guarded", "Guarded"),
         ("curriculum", "Curriculum"),
         ("recover", "Recover"),
         ("polish", "Polish"),
         ("long", "Long"),
+        ("wide", "Wide"),
+        ("mid", "Mid"),
+        ("perf", "Performance"),
         ("init", "Init"),
         ("tilt", "Tilt"),
         ("rebound", "Rebound"),
+        ("chase", "Chase"),
+        ("sector", "Sector"),
+        ("disk", "Disk"),
+        ("fast", "Fast"),
+        ("smoke", "Smoke"),
         ("baseline", "Baseline"),
         ("active_hit", "Active Hit"),
-        ("robot_base", "Robot Base"),
     ]
     for key, label in keywords:
+        if key == "racket_tracking" and ("tracking_spin" in raw_run_name or "tracking_staged" in raw_run_name):
+            continue
         if key in raw_run_name and label not in descriptors:
             descriptors.append(label)
     return descriptors[:2]
