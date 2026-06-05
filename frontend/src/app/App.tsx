@@ -33,7 +33,7 @@ const SimulationCanvas = lazy(() =>
 );
 
 export function App() {
-  const isDocsPage = window.location.pathname === "/docs";
+  const isDocsPage = false;
   const [playback, setPlayback] = useState<PlaybackState>("playing");
   const [cameraMode, setCameraMode] = useState<CameraMode>("free");
   const [visualization, setVisualization] = useState<VisualizationSettings>(DEFAULT_VISUALIZATION);
@@ -216,7 +216,8 @@ export function App() {
           <span>Ping-Pong Keep-Up</span>
         </a>
         <nav className="nav-links" aria-label="Primary navigation">
-          {isDocsPage ? null : <a href="/docs">Docs</a>}
+          {/* Docs is temporarily hidden while the content is being revised. */}
+          {/* {isDocsPage ? null : <a href="/docs">Docs</a>} */}
           <a href={GITHUB_URL} target="_blank" rel="noreferrer">
             <ExternalLink size={17} />
             <span>GitHub</span>
@@ -252,6 +253,7 @@ export function App() {
                   <span className={ready ? "status-dot ready" : "status-dot"} />
                   <span>{ready ? "Simulation Ready" : snapshot.mujocoLoaded ? snapshot.policyMessage : status}</span>
                 </div>
+                <div className="shared-session-note">Shared demo session: changes affect all viewers.</div>
                 {showLoadingOverlay ? (
                   <LoadingOverlay
                     status={status}

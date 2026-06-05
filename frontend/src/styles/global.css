@@ -149,6 +149,24 @@ button {
   backdrop-filter: blur(10px);
 }
 
+.shared-session-note {
+  position: absolute;
+  top: 60px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 5;
+  max-width: min(360px, calc(100% - 48px));
+  padding: 7px 10px;
+  border: 1px solid rgba(50, 213, 164, 0.32);
+  border-radius: 7px;
+  background: rgba(17, 17, 17, 0.68);
+  color: #dffbf3;
+  font-size: 0.78rem;
+  font-weight: 680;
+  line-height: 1.2;
+  backdrop-filter: blur(10px);
+}
+
 .status-dot {
   width: 9px;
   height: 9px;
@@ -307,8 +325,8 @@ button {
 
 .model-shell {
   position: absolute;
-  top: 16px;
-  bottom: 16px;
+  top: 68px;
+  bottom: 14px;
   left: 20px;
   z-index: 7;
   width: 340px;
@@ -483,7 +501,7 @@ button {
 
 .dimension-picker {
   display: grid;
-  gap: 6px;
+  gap: 5px;
   grid-template-columns: repeat(2, minmax(0, 1fr));
 }
 
@@ -492,8 +510,8 @@ button {
   gap: 1px;
   justify-items: start;
   min-width: 0;
-  min-height: 42px;
-  padding: 7px 10px;
+  min-height: 36px;
+  padding: 5px 10px;
   border: 1px solid var(--line);
   border-radius: 7px;
   background: #202020;
@@ -674,17 +692,17 @@ select {
 
 .action-bar-list {
   display: grid;
-  gap: 4px;
+  gap: 2px;
 }
 
 .action-row {
   display: grid;
   grid-template-columns: 82px minmax(0, 1fr) 50px;
   align-items: center;
-  gap: 7px;
-  min-height: 17px;
+  gap: 6px;
+  min-height: 13px;
   color: var(--muted);
-  font-size: 0.68rem;
+  font-size: 0.62rem;
 }
 
 .action-row > span {
@@ -696,13 +714,13 @@ select {
 
 .action-row strong {
   color: #eeeeee;
-  font: 0.68rem/1 ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
+  font: 0.62rem/1 ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
   text-align: right;
 }
 
 .action-track {
   position: relative;
-  height: 6px;
+  height: 5px;
   overflow: hidden;
   border-radius: 999px;
   background: rgba(255, 255, 255, 0.12);
