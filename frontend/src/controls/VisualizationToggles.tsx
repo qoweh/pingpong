@@ -16,18 +16,6 @@ export function VisualizationToggles({ value, onChange }: VisualizationTogglesPr
     <div className="control-section">
       <h2>Visualization</h2>
       <div className="toggle-list">
-        <label className="select-row">
-          <span>Racket face</span>
-          <select
-            value={value.racketDisplay}
-            onChange={(event) =>
-              onChange({ ...value, racketDisplay: event.target.value as VisualizationSettings["racketDisplay"] })
-            }
-          >
-            <option value="training">Training side</option>
-            <option value="presentation">Red side</option>
-          </select>
-        </label>
         {TOGGLES.map((toggle) => (
           <label className="toggle-row" key={toggle.key}>
             <input

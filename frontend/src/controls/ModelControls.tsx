@@ -27,7 +27,6 @@ export function ModelControls({
     <div className="control-section model-section">
       <div className="section-heading">
         <h2>Model</h2>
-        {selectedModel?.dimensionGroup ? <span>{selectedModel.dimensionGroup}</span> : null}
       </div>
       <span className="inline-status">{switchHint}</span>
       <div className="model-keypad" aria-label="Policy models">
@@ -59,8 +58,6 @@ export function ModelControls({
       ) : null}
       {selectedModel ? (
         <div className="model-info-grid" aria-label="Model information">
-          <span>Series</span>
-          <strong>{selectedModel.name}</strong>
           <span>Observation</span>
           <strong>{formatDim(selectedModel.observationDim)}</strong>
           <span>Action</span>

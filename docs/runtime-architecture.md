@@ -35,6 +35,16 @@ shared MuJoCo env -> shared PPO predict -> latest frame
 
 이 구조에서는 model select, reset, spawn, playback 명령이 shared demo session에 적용된다. 즉 한 사용자가 모델을 바꾸면 같은 live demo를 보고 있는 다른 사용자도 같은 모델 상태를 보게 된다. 공개 데모 목적에서는 서버 비용을 크게 줄이는 쪽이 더 중요하다.
 
+사용자별로 모델 선택, 공 시작값, 재생 상태를 독립적으로 가져가려면 shared session이 아니라 per-client session pool 구조가 필요하다.
+
+```text
+client A -> MuJoCo env A -> PPO predict A -> frame A
+client B -> MuJoCo env B -> PPO predict B -> frame B
+...
+```
+
+홈서버에서 이 구조를 쓸 때는 동시 active session 수를 제한해야 한다. 예를 들어 active 10명까지만 session을 만들고, 초과 사용자는 대기 상태를 받게 한다. 20-30명의 독립 session은 CPU 사용량이 거의 session 수에 비례하므로 단일 홈서버보다 여러 worker/container로 나누거나, 서버는 policy/MuJoCo를 낮은 tick rate로 돌리고 브라우저는 보간 렌더링만 하는 식의 구조가 필요하다.
+
 ## WebSocket 종료 오류
 
 다음 오류는 이미 닫힌 WebSocket에 서버가 frame을 보내려 할 때 발생한다.

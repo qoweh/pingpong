@@ -28,6 +28,7 @@ CATALOG_EXCLUDED_RUN_NAMES = {
     "keep1_v40_17d_v39_polish",
     "pmk_cf_self_rally_v29_first_contact_chase_sector",
 }
+CATALOG_EXCLUDED_ACTION_DIMS = {19}
 CATALOG_VISIBLE_RUN_NAMES = {
     "keep_v39_17d",
     "keep1_v38_17d_mid_curriculum_recover",
@@ -38,8 +39,6 @@ CATALOG_VISIBLE_RUN_NAMES = {
     "pmk_cf_self_rally_v17",
     "pmk_cf_self_rally_v16",
     "pmk_cf_self_rally_v5",
-    "ppo_keepup_v17",
-    "ppo_keepup_v7",
 }
 
 
@@ -67,6 +66,8 @@ def build_model_catalog(
         if infer_run_name(path) in CATALOG_EXCLUDED_RUN_NAMES:
             continue
         record = build_model_record(path, project_root, resolve_env_kwargs, used_ids)
+        if record.metadata.get("actionDim") in CATALOG_EXCLUDED_ACTION_DIMS:
+            continue
         records[record.id] = record
         used_ids.add(record.id)
 

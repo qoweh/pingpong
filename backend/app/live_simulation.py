@@ -332,10 +332,11 @@ class LiveSimulationHub:
                 raise
             except Exception:
                 LOGGER.exception("Live simulation loop failed")
+                self.command_state.playback = "paused"
                 self._publish(
                     {
                         "type": "error",
-                        "message": "Live simulation paused because the selected model could not run. Choose another model.",
+                        "message": "Live simulation paused because the selected model could not run. Select another model.",
                     }
                 )
                 await asyncio.sleep(0.5)
@@ -372,6 +373,10 @@ def model_selection_message(model_id: str, error: Exception) -> str:
     detail = str(error)
     if "action_mode must be one of" in detail:
         return f"Model {model_id} is not compatible with the current runtime action mode."
+    if "observation shape mismatch" in detail:
+        return f"Model {model_id} is not compatible with the current runtime observation format."
+    if "action shape mismatch" in detail:
+        return f"Model {model_id} is not compatible with the current runtime action format."
     if detail:
         return f"Model {model_id} could not be loaded: {detail}"
     return f"Model {model_id} could not be loaded."
@@ -392,6 +397,7 @@ class LiveSimulationSession:
         self.custom_reset_options: dict[str, Any] | None = None
         self.observation, self.last_info = self.env.reset(seed=service.settings.seed)
         self.runtime.control_dt = self.control_dt
+        self._validate_policy_shapes()
 
     @property
     def ball_spawn_config(self) -> dict[str, Any]:
@@ -418,6 +424,7 @@ class LiveSimulationSession:
             seed=self.service.settings.seed + self.episode_index,
             options=self.custom_reset_options,
         )
+        self._validate_observation_shape()
         return self.frame(reset=True)
 
     def spawn_ball(self, options: dict[str, Any]) -> dict[str, Any]:
@@ -441,6 +448,7 @@ class LiveSimulationSession:
         self.last_reward = None
         self.last_contact = None
         self.observation = base_env.observation().astype(np.float32, copy=False)
+        self._validate_observation_shape()
         self.last_info = self._spawn_info(ball_xy_offset)
         return self.frame(reset=True)
 
@@ -462,6 +470,25 @@ class LiveSimulationSession:
         )
         self.reset_pending = bool(terminated or truncated)
         return frame
+
+    def _validate_policy_shapes(self) -> None:
+        self._validate_observation_shape()
+        expected_action_dim = int(self.runtime.metadata.get("actionDim") or 0)
+        actual_action_dim = action_space_dim(getattr(self.env, "action_space", None))
+        if expected_action_dim and actual_action_dim and expected_action_dim != actual_action_dim:
+            raise ValueError(
+                "Model/runtime action shape mismatch: "
+                f"model expects {expected_action_dim} controls, runtime produced {actual_action_dim}."
+            )
+
+    def _validate_observation_shape(self) -> None:
+        expected_observation_dim = int(self.runtime.metadata.get("observationDim") or 0)
+        actual_observation_dim = int(np.asarray(self.observation).reshape(-1).shape[0])
+        if expected_observation_dim and expected_observation_dim != actual_observation_dim:
+            raise ValueError(
+                "Model/runtime observation shape mismatch: "
+                f"model expects {expected_observation_dim} values, runtime produced {actual_observation_dim}."
+            )
 
     def _clear_episode_counters(self) -> None:
         base_env = self.env.base_env
@@ -581,6 +608,15 @@ def numeric_list(values: Any) -> list[float]:
 def numeric_vec3(values: Any) -> list[float]:
     vector = numeric_list(values)
     return [float(vector[0]), float(vector[1]), float(vector[2])]
+
+
+def action_space_dim(action_space: Any) -> int | None:
+    shape = getattr(action_space, "shape", None)
+    if isinstance(shape, tuple) and shape:
+        return int(shape[0])
+    if isinstance(shape, list) and shape:
+        return int(shape[0])
+    return None
 
 
 def portable_path(path: Path, root: Path) -> str:

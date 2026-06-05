@@ -1,13 +1,8 @@
 import { RotateCcw } from "lucide-react";
-import { useState } from "react";
 
 import type { BallSpawnConfig, BallSpawnSettings } from "../simulation/types";
 import { DEFAULT_BALL_SPAWN_CONFIG } from "../simulation/types";
-import {
-  clampBallSpawnSettings,
-  rangeBounds,
-  type BallSpawnClampMode
-} from "../simulation/ballSpawnConfig";
+import { clampBallSpawnSettings, rangeBounds } from "../simulation/ballSpawnConfig";
 
 interface BallControlsProps {
   value: BallSpawnSettings;
@@ -30,8 +25,7 @@ const AXES: Array<{
 
 export function BallControls({ value, config, onChange }: BallControlsProps) {
   const activeConfig = config ?? DEFAULT_BALL_SPAWN_CONFIG;
-  const [useExtendedRange, setUseExtendedRange] = useState(false);
-  const clampMode: BallSpawnClampMode = useExtendedRange ? "extended" : "trained";
+  const clampMode = "trained" as const;
 
   const updateValue = (key: keyof BallSpawnSettings, rawValue: number) => {
     if (!Number.isFinite(rawValue)) {
@@ -45,19 +39,7 @@ export function BallControls({ value, config, onChange }: BallControlsProps) {
       <div className="section-heading">
         <h2>Ball Start</h2>
       </div>
-      <span className="inline-status">Some starts can still fail.</span>
-      <label className="toggle-row compact">
-        <input
-          type="checkbox"
-          checked={useExtendedRange}
-          onChange={(event) => {
-            const nextMode: BallSpawnClampMode = event.target.checked ? "extended" : "trained";
-            setUseExtendedRange(event.target.checked);
-            onChange(clampBallSpawnSettings(value, activeConfig, nextMode));
-          }}
-        />
-        <span>Stress range</span>
-      </label>
+      <span className="inline-status">Some start conditions may fail.</span>
       {AXES.map((axis) => {
         const range = activeConfig.ranges[axis.key];
         const bounds = rangeBounds(range, clampMode);

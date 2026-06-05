@@ -89,7 +89,7 @@ v39는 공 시작 조건을 고정하지 않았다. 학습 중 시작 위치와 
 | X/Y 초기 속도 | -0.045m/s ~ +0.045m/s |
 | Z 초기 속도 | -0.14m/s ~ +0.04m/s |
 
-웹 조작 패널의 기본 모드는 이 학습 안전 범위를 우선 사용한다. 분석용 확장 범위는 Stress range 토글로 분리되어 있고, v39 기준 X/Y offset은 최대 0.16m, Z 높이는 0.18m ~ 0.56m까지 조작할 수 있다. 학습 분포가 XY disk sampling인 모델은 X/Y를 독립 사각형으로 두지 않고 반경 기준으로 clamp한다. v39 기본 모드에서는 반경 0.13m, Stress range에서는 검증 반경 0.16m 안으로 정규화된다. 같은 clamp는 range slider, 숫자 입력, backend `parse_ball_spawn_options`에 모두 적용된다.
+웹 조작 패널은 이 학습 안전 범위를 우선 사용한다. 학습 분포가 XY disk sampling인 모델은 X/Y를 독립 사각형으로 두지 않고 반경 기준으로 clamp한다. 같은 clamp는 range slider, 숫자 입력, backend `parse_ball_spawn_options`에 모두 적용된다.
 
 ## 평가 요약
 

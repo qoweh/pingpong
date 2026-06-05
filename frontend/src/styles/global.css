@@ -344,8 +344,8 @@ button {
 }
 
 .panel-toggle.left {
-  right: auto;
-  left: 12px;
+  right: 12px;
+  left: auto;
 }
 
 .control-shell.closed .panel-toggle {
@@ -355,6 +355,7 @@ button {
 
 .model-shell.closed .panel-toggle {
   top: 0;
+  right: auto;
   left: 0;
 }
 
@@ -372,7 +373,7 @@ button {
   width: 100%;
   height: 100%;
   max-height: 100%;
-  padding: 18px;
+  padding: 56px 18px 18px;
   border: 1px solid rgba(255, 255, 255, 0.12);
   border-radius: 7px;
   background: rgba(17, 17, 17, 0.78);
@@ -968,9 +969,15 @@ select {
     right: 14px;
   }
 
-  .panel-toggle.left,
+  .panel-toggle.left {
+    top: 14px;
+    right: 14px;
+    left: auto;
+  }
+
   .model-shell.closed .panel-toggle {
     top: 14px;
+    right: auto;
     left: 14px;
   }
 

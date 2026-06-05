@@ -21,7 +21,7 @@ export class MujocoModelScene {
   private readonly geometries: THREE.BufferGeometry[] = [];
   private readonly materials: THREE.Material[] = [];
   private readonly textures: THREE.Texture[] = [];
-  private racketDisplay: VisualizationSettings["racketDisplay"] = "training";
+  private racketDisplay: VisualizationSettings["racketDisplay"] = "presentation";
   private racketHeadMaterial: THREE.MeshStandardMaterial | null = null;
 
   constructor(private readonly runtime: MujocoRuntime) {

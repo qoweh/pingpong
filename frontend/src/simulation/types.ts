@@ -140,7 +140,7 @@ export const DEFAULT_VISUALIZATION: VisualizationSettings = {
   trail: false,
   targetBand: false,
   contactMarker: false,
-  racketDisplay: "training"
+  racketDisplay: "presentation"
 };
 
 export const DEFAULT_BALL_SPAWN: BallSpawnSettings = {
