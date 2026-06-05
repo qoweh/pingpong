@@ -1,50 +1,77 @@
 import { RotateCcw } from "lucide-react";
 
-import type { BallSpawnSettings } from "../simulation/types";
-import { DEFAULT_BALL_SPAWN } from "../simulation/types";
+import type { BallSpawnConfig, BallSpawnSettings } from "../simulation/types";
+import { DEFAULT_BALL_SPAWN_CONFIG } from "../simulation/types";
 
 interface BallControlsProps {
   value: BallSpawnSettings;
+  config: BallSpawnConfig;
   onChange: (value: BallSpawnSettings) => void;
 }
 
 const AXES: Array<{
   key: keyof BallSpawnSettings;
   label: string;
-  min: number;
-  max: number;
-  step: number;
+  unit: string;
 }> = [
-  { key: "xOffset", label: "X Position", min: -0.15, max: 0.15, step: 0.005 },
-  { key: "yOffset", label: "Y Position", min: -0.15, max: 0.15, step: 0.005 },
-  { key: "zOffset", label: "Z Position", min: 0.18, max: 0.56, step: 0.005 },
-  { key: "velocityX", label: "X Velocity", min: -0.06, max: 0.06, step: 0.005 },
-  { key: "velocityY", label: "Y Velocity", min: -0.06, max: 0.06, step: 0.005 },
-  { key: "velocityZ", label: "Z Velocity", min: -0.18, max: 0.04, step: 0.005 }
+  { key: "xOffset", label: "X Pos", unit: "m" },
+  { key: "yOffset", label: "Y Pos", unit: "m" },
+  { key: "zOffset", label: "Z Pos", unit: "m" },
+  { key: "velocityX", label: "X Vel", unit: "m/s" },
+  { key: "velocityY", label: "Y Vel", unit: "m/s" },
+  { key: "velocityZ", label: "Z Vel", unit: "m/s" }
 ];
 
-export function BallControls({ value, onChange }: BallControlsProps) {
+export function BallControls({ value, config, onChange }: BallControlsProps) {
+  const activeConfig = config ?? DEFAULT_BALL_SPAWN_CONFIG;
+
+  const updateValue = (key: keyof BallSpawnSettings, rawValue: number) => {
+    if (!Number.isFinite(rawValue)) {
+      return;
+    }
+    const range = activeConfig.ranges[key];
+    const nextValue = Math.min(Math.max(rawValue, range.min), range.max);
+    onChange({ ...value, [key]: nextValue });
+  };
+
   return (
     <div className="control-section">
       <h2>Ball Start</h2>
-      {AXES.map((axis) => (
-        <label className="range-row" key={axis.key}>
-          <span>{axis.label}</span>
-          <input
-            type="range"
-            min={axis.min}
-            max={axis.max}
-            step={axis.step}
-            value={value[axis.key]}
-            onChange={(event) => {
-              onChange({ ...value, [axis.key]: Number(event.target.value) });
-            }}
-          />
-          <output>{value[axis.key].toFixed(2)}</output>
-        </label>
-      ))}
+      {AXES.map((axis) => {
+        const range = activeConfig.ranges[axis.key];
+        const trainedMin = range.trainedMin ?? range.min;
+        const trainedMax = range.trainedMax ?? range.max;
+        const title = `trained ${trainedMin.toFixed(3)}..${trainedMax.toFixed(3)} ${axis.unit}`;
+        return (
+          <label className="range-row" key={axis.key} title={title}>
+            <span>{axis.label}</span>
+            <input
+              type="range"
+              min={range.min}
+              max={range.max}
+              step={range.step}
+              value={value[axis.key]}
+              onChange={(event) => {
+                updateValue(axis.key, Number(event.target.value));
+              }}
+            />
+            <input
+              className="range-number"
+              type="number"
+              min={range.min}
+              max={range.max}
+              step={range.step}
+              value={value[axis.key].toFixed(3)}
+              aria-label={axis.label}
+              onChange={(event) => {
+                updateValue(axis.key, Number(event.target.value));
+              }}
+            />
+          </label>
+        );
+      })}
       <div className="button-row">
-        <button className="action-button muted full" type="button" onClick={() => onChange(DEFAULT_BALL_SPAWN)}>
+        <button className="action-button muted full" type="button" onClick={() => onChange(activeConfig.defaults)}>
           <RotateCcw size={16} />
           <span>Reset Ball</span>
         </button>

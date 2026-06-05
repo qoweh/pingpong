@@ -3,6 +3,9 @@ services:
     build:
       context: .
       dockerfile: backend/Dockerfile
+      args:
+        PINGPONG_POLICY_MODEL_PATH: "${PINGPONG_POLICY_MODEL_PATH:-rl/artifacts/keep_v39_17d/keep_v39_17d_model.zip}"
+        PINGPONG_MUJOCO_SCENE_PATH: "${PINGPONG_MUJOCO_SCENE_PATH:-rl/assets/scene.xml}"
     image: pingpong-web:local
     container_name: pingpong-web
     ports:
@@ -10,6 +13,7 @@ services:
     environment:
       SERVER_PORT: 8079
       PINGPONG_POLICY_MODEL_PATH: "${PINGPONG_POLICY_MODEL_PATH:-rl/artifacts/keep_v39_17d/keep_v39_17d_model.zip}"
+      PINGPONG_MUJOCO_SCENE_PATH: "${PINGPONG_MUJOCO_SCENE_PATH:-rl/assets/scene.xml}"
       PINGPONG_POLICY_DETERMINISTIC: "${PINGPONG_POLICY_DETERMINISTIC:-true}"
       PINGPONG_LIVE_SEED: "${PINGPONG_LIVE_SEED:-251}"
     restart: unless-stopped

@@ -11,6 +11,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 
+from .ball_spawn import BallSpawnConfig, parse_ball_spawn_options
 from .live_simulation import LiveCommandState, LiveSimulationService
 from .settings import load_settings
 
@@ -52,12 +53,13 @@ async def config() -> dict[str, Any]:
 @app.websocket("/api/live")
 async def live(websocket: WebSocket) -> None:
     await websocket.accept()
+    simulation = app.state.simulation
     command_state = LiveCommandState()
-    session = await asyncio.to_thread(app.state.simulation.create_session)
-    receiver = asyncio.create_task(receive_commands(websocket, command_state))
+    session = await asyncio.to_thread(simulation.create_session)
+    receiver = asyncio.create_task(receive_commands(websocket, command_state, simulation.ball_spawn_config))
 
     try:
-        await websocket.send_json({"type": "ready", "config": app.state.simulation.config_payload()})
+        await websocket.send_json({"type": "ready", "config": simulation.config_payload()})
         await websocket.send_json(session.frame(reset=True))
 
         while True:
@@ -85,7 +87,7 @@ async def live(websocket: WebSocket) -> None:
         await asyncio.gather(receiver, return_exceptions=True)
 
 
-async def receive_commands(websocket: WebSocket, state: LiveCommandState) -> None:
+async def receive_commands(websocket: WebSocket, state: LiveCommandState, ball_spawn_config: BallSpawnConfig) -> None:
     try:
         while True:
             raw_message = await websocket.receive_text()
@@ -102,32 +104,10 @@ async def receive_commands(websocket: WebSocket, state: LiveCommandState) -> Non
                 if playback in {"playing", "paused"}:
                     state.playback = playback
             elif message_type == "spawnBall":
-                state.ball_spawn_options = parse_ball_spawn_options(message)
+                state.ball_spawn_options = parse_ball_spawn_options(message, ball_spawn_config)
                 state.ball_spawn_requested = True
     except WebSocketDisconnect:
         return
-
-
-def parse_ball_spawn_options(message: dict[str, Any]) -> dict[str, Any]:
-    x_offset = clamp_float(message.get("xOffset"), -0.2, 0.2, 0.0)
-    y_offset = clamp_float(message.get("yOffset"), -0.2, 0.2, 0.0)
-    z_offset = clamp_float(message.get("zOffset"), 0.08, 0.9, 0.34)
-    velocity_x = clamp_float(message.get("velocityX"), -1.0, 1.0, 0.0)
-    velocity_y = clamp_float(message.get("velocityY"), -1.0, 1.0, 0.0)
-    velocity_z = clamp_float(message.get("velocityZ"), -1.0, 1.0, 0.0)
-    return {
-        "ball_height": z_offset,
-        "ball_xy_offset": [x_offset, y_offset],
-        "ball_velocity": [velocity_x, velocity_y, velocity_z],
-    }
-
-
-def clamp_float(value: Any, low: float, high: float, fallback: float) -> float:
-    try:
-        parsed = float(value)
-    except (TypeError, ValueError):
-        return fallback
-    return min(max(parsed, low), high)
 
 
 frontend_dist = settings.frontend_dist

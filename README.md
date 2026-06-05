@@ -38,6 +38,14 @@ bash deploy/preflight.sh
 
 `Policy model is missing` 오류가 나면 `.env`의 `PINGPONG_POLICY_MODEL_PATH`가 서버 작업 디렉토리 안에 실제로 존재하는지 확인한다. Stable-Baselines3는 zip이 없을 때 내부적으로 `.zip` 후보를 덧붙일 수 있어서 로그에 `.zip.zip`처럼 보일 수 있지만, 실제 원인은 지정한 모델 zip이 없다는 뜻이다.
 
+`docker compose up -d --build --force-recreate`만 실행해도 Docker build 단계에서 모델 zip, MuJoCo scene, vendored RL package, Franka asset 존재 여부를 검사한다. `deploy/preflight.sh`는 같은 검사를 build 전에 더 빨리 확인하고 싶을 때 사용한다.
+
+preflight와 compose update를 항상 묶어서 실행하려면 wrapper를 사용한다.
+
+```sh
+bash deploy/update.sh
+```
+
 ## 로컬 실행
 
 프론트엔드 개발 서버:

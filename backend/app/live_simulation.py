@@ -9,6 +9,7 @@ from typing import Any
 import numpy as np
 from stable_baselines3 import PPO
 
+from .ball_spawn import build_ball_spawn_config
 from .settings import AppSettings
 
 
@@ -32,6 +33,7 @@ class LiveSimulationService:
         self.env_class = PingPongKeepUpGymEnv
         self.env_kwargs = resolve_env_kwargs_for_model(settings.model_path)
         self.env_kwargs["scene_path"] = str(settings.scene_path)
+        self.ball_spawn_config = build_ball_spawn_config(self.env_kwargs, settings.model_path)
         self.policy = PPO.load(str(settings.model_path), device="cpu")
         self.policy_lock = threading.Lock()
         self.policy_message = f"Model: {display_model_name(settings.model_path)}"
@@ -55,6 +57,7 @@ class LiveSimulationService:
             "deterministic": self.settings.deterministic_policy,
             "seed": self.settings.seed,
             "controlDt": self.control_dt,
+            "ballSpawn": self.ball_spawn_config,
         }
 
     @staticmethod

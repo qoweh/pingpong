@@ -23,6 +23,18 @@ curl http://localhost:8079/api/health
 
 서버에서 직접 build하면 Docker가 해당 서버에 맞는 native image를 만든다.
 
+직접 명령을 줄이고 싶으면 아래처럼 한 번에 실행해도 된다. Dockerfile에 같은 런타임 파일 검사가 들어 있어서 모델 zip이나 scene이 빠지면 build 단계에서 실패한다.
+
+```sh
+docker compose up -d --build --force-recreate
+```
+
+preflight를 build 전에 반드시 먼저 실행하고 싶으면 wrapper를 사용한다.
+
+```sh
+bash deploy/update.sh
+```
+
 Apple Silicon Mac에서 서버용 이미지를 만들 때는 platform을 명시한다.
 
 ```sh

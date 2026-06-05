@@ -389,7 +389,7 @@ button {
 
 .range-row {
   display: grid;
-  grid-template-columns: 78px minmax(0, 1fr) 58px;
+  grid-template-columns: 56px minmax(0, 1fr) 74px;
   align-items: center;
   gap: 10px;
   color: var(--muted);
@@ -401,9 +401,22 @@ button {
   accent-color: var(--accent);
 }
 
-.range-row output {
+.range-number {
+  width: 100%;
+  height: 28px;
+  min-width: 0;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: #1f1f1f;
   color: #f1f1f1;
+  font: inherit;
   text-align: right;
+  padding: 0 6px;
+}
+
+.range-number:focus {
+  border-color: rgba(255, 157, 27, 0.8);
+  outline: none;
 }
 
 .button-row {

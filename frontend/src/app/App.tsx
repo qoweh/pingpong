@@ -1,12 +1,14 @@
 import { ExternalLink, PanelRightClose, PanelRightOpen } from "lucide-react";
-import { lazy, Suspense, useCallback, useState } from "react";
+import { lazy, Suspense, useCallback, useEffect, useState } from "react";
 
 import { BallControls } from "../controls/BallControls";
 import { CameraControls } from "../controls/CameraControls";
 import { PlaybackControls } from "../controls/PlaybackControls";
 import { VisualizationToggles } from "../controls/VisualizationToggles";
 import { DocsPage } from "./DocsPage";
+import { clampBallSpawnSettings, parseBallSpawnConfig } from "../simulation/ballSpawnConfig";
 import type {
+  BallSpawnConfig,
   BallSpawnSettings,
   CameraMode,
   LoadingProgress,
@@ -14,7 +16,7 @@ import type {
   SimulationSnapshot,
   VisualizationSettings
 } from "../simulation/types";
-import { DEFAULT_BALL_SPAWN, DEFAULT_VISUALIZATION, ZERO_SNAPSHOT } from "../simulation/types";
+import { DEFAULT_BALL_SPAWN, DEFAULT_BALL_SPAWN_CONFIG, DEFAULT_VISUALIZATION, ZERO_SNAPSHOT } from "../simulation/types";
 
 const GITHUB_URL = "https://github.com/qoweh/pingpong";
 const INITIAL_LOADING_PROGRESS: LoadingProgress = {
@@ -31,6 +33,7 @@ export function App() {
   const [cameraMode, setCameraMode] = useState<CameraMode>("free");
   const [visualization, setVisualization] = useState<VisualizationSettings>(DEFAULT_VISUALIZATION);
   const [ballSpawn, setBallSpawn] = useState<BallSpawnSettings>(DEFAULT_BALL_SPAWN);
+  const [ballSpawnConfig, setBallSpawnConfig] = useState<BallSpawnConfig>(DEFAULT_BALL_SPAWN_CONFIG);
   const [snapshot, setSnapshot] = useState<SimulationSnapshot>(ZERO_SNAPSHOT);
   const [status, setStatus] = useState("Preparing simulation");
   const [loadingProgress, setLoadingProgress] = useState<LoadingProgress>(INITIAL_LOADING_PROGRESS);
@@ -61,6 +64,37 @@ export function App() {
   const updateLoadingProgress = useCallback((progress: LoadingProgress) => {
     setLoadingProgress(progress);
   }, []);
+
+  useEffect(() => {
+    if (isDocsPage) {
+      return;
+    }
+
+    let cancelled = false;
+
+    async function loadConfig() {
+      try {
+        const response = await fetch("/api/config");
+        if (!response.ok) {
+          return;
+        }
+        const payload = (await response.json()) as { ballSpawn?: unknown };
+        const parsedConfig = parseBallSpawnConfig(payload.ballSpawn);
+        if (!cancelled) {
+          setBallSpawnConfig(parsedConfig);
+          setBallSpawn((current) => clampBallSpawnSettings(current, parsedConfig));
+        }
+      } catch {
+        return;
+      }
+    }
+
+    void loadConfig();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [isDocsPage]);
 
   return (
     <div className="app-shell">
@@ -142,7 +176,7 @@ export function App() {
                       </div>
                     </div>
 
-                    <BallControls value={ballSpawn} onChange={updateBallSpawn} />
+                    <BallControls value={ballSpawn} config={ballSpawnConfig} onChange={updateBallSpawn} />
                     <CameraControls value={cameraMode} onChange={setCameraMode} />
                     <VisualizationToggles value={visualization} onChange={setVisualization} />
 

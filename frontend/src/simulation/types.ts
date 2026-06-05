@@ -26,6 +26,21 @@ export interface BallSpawnSettings {
   velocityZ: number;
 }
 
+export interface BallSpawnRange {
+  min: number;
+  max: number;
+  step: number;
+  trainedMin?: number;
+  trainedMax?: number;
+}
+
+export type BallSpawnRanges = Record<keyof BallSpawnSettings, BallSpawnRange>;
+
+export interface BallSpawnConfig {
+  defaults: BallSpawnSettings;
+  ranges: BallSpawnRanges;
+}
+
 export interface BallState {
   position: Vec3;
   velocity: Vec3;
@@ -77,6 +92,18 @@ export const DEFAULT_BALL_SPAWN: BallSpawnSettings = {
   velocityX: 0,
   velocityY: 0,
   velocityZ: 0
+};
+
+export const DEFAULT_BALL_SPAWN_CONFIG: BallSpawnConfig = {
+  defaults: DEFAULT_BALL_SPAWN,
+  ranges: {
+    xOffset: { min: -0.16, max: 0.16, step: 0.005, trainedMin: -0.13, trainedMax: 0.13 },
+    yOffset: { min: -0.16, max: 0.16, step: 0.005, trainedMin: -0.13, trainedMax: 0.13 },
+    zOffset: { min: 0.18, max: 0.56, step: 0.005, trainedMin: 0.22, trainedMax: 0.52 },
+    velocityX: { min: -0.06, max: 0.06, step: 0.005, trainedMin: -0.045, trainedMax: 0.045 },
+    velocityY: { min: -0.06, max: 0.06, step: 0.005, trainedMin: -0.045, trainedMax: 0.045 },
+    velocityZ: { min: -0.18, max: 0.04, step: 0.005, trainedMin: -0.14, trainedMax: 0.04 }
+  }
 };
 
 export const DEFAULT_DEMO_CONFIG: DemoConfig = {
