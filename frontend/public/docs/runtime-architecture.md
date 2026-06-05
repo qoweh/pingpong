@@ -75,7 +75,7 @@ after sending 'websocket.close' or response already completed.
 
 3D scene은 모델을 바꿔도 동일하다. 따라서 브라우저 캔버스, MuJoCo WebAssembly, `pingpong_scene.mjb`는 다시 로드하지 않는다.
 
-처음 선택하는 action dimension은 policy load 때문에 대략 0.5초에서 몇 초까지 걸릴 수 있다. 현재 UI는 dimension별 최신 대표 모델 하나만 노출하므로 선택은 곧 action dimension 전환이다. 실제로 가장 큰 차이는 서버 runtime cache 여부에서 난다. 한 번 선택한 dimension은 서버가 runtime을 캐시하므로 다시 선택할 때 훨씬 빠르다. 다른 action dimension 모델은 action label, env kwargs, policy shape가 달라서 새 runtime 준비가 더 길게 느껴질 수 있다.
+처음 선택하는 action dimension은 policy load 때문에 대략 0.5초에서 몇 초까지 걸릴 수 있다. 현재 UI는 dimension별 대표 모델 하나만 노출하므로 선택은 곧 action dimension 전환이다. 실제로 가장 큰 차이는 서버 runtime cache 여부에서 난다. 한 번 선택한 dimension은 서버가 runtime을 캐시하므로 다시 선택할 때 훨씬 빠르다. 다른 action dimension 모델은 action label, env kwargs, policy shape가 달라서 새 runtime 준비가 더 길게 느껴질 수 있다.
 
 Live demo에서는 모델 summary에 저장된 `max_episode_steps` 값을 그대로 쓰지 않고 서버 runtime에서 `0`으로 덮어쓴다. 이 환경에서 `0`은 unlimited를 뜻하므로, 실패 조건이 발생하지 않는 한 episode step limit 때문에 자동 reset되지 않는다.
 

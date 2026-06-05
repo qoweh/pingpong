@@ -29,6 +29,9 @@ CATALOG_EXCLUDED_RUN_NAMES = {
     "pmk_cf_self_rally_v29_first_contact_chase_sector",
 }
 CATALOG_EXCLUDED_ACTION_DIMS = {19}
+CATALOG_REPRESENTATIVE_RUN_NAMES_BY_ACTION_DIM = {
+    5: "ppo_keepup_v9",
+}
 SUMMARY_ENV_HINT_KEYS = {
     "action_mode",
     "action_limit",
@@ -220,16 +223,28 @@ def assign_dimension_versions(records: dict[str, ModelRecord]) -> dict[str, Mode
 
     ordered = sorted(assigned, key=assigned_record_sort_key)
     latest_by_dimension: dict[str, int] = {}
+    representative_by_dimension: dict[str, str] = {}
     for record in ordered:
         group = str(record.metadata.get("dimensionGroup") or "")
         latest_by_dimension[group] = max(latest_by_dimension.get(group, 0), int(record.metadata.get("sortVersion") or 0))
+        action_dim = record.metadata.get("actionDim")
+        representative = CATALOG_REPRESENTATIVE_RUN_NAMES_BY_ACTION_DIM.get(action_dim)
+        if representative:
+            representative_by_dimension[group] = representative
 
     visible_ordered = []
     for record in ordered:
         group = str(record.metadata.get("dimensionGroup") or "")
+        representative = representative_by_dimension.get(group)
+        raw_run_name = str(record.metadata.get("rawRunName") or record.id)
+        is_visible = (
+            raw_run_name == representative
+            if representative
+            else int(record.metadata.get("sortVersion") or 0) == latest_by_dimension.get(group, 0)
+        )
         metadata = {
             **record.metadata,
-            "catalogVisible": int(record.metadata.get("sortVersion") or 0) == latest_by_dimension.get(group, 0),
+            "catalogVisible": is_visible,
         }
         visible_ordered.append(
             ModelRecord(

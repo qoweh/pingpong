@@ -1,6 +1,6 @@
 # 제어 모델과 학습
 
-현재 기본 제어 모델은 `keep_v39_17d`다. 모델 파일 이름은 `keep_v39_17d_model.zip`이고, Stable-Baselines3 2.8.0의 PPO 형식으로 저장되어 있다. 초기 active model은 `.env`의 `PINGPONG_POLICY_MODEL_PATH`로 정하지만, 실행 중에는 웹 UI의 Action Dimension 섹션에서 `rl/artifacts` 아래의 dimension별 최신 대표 PPO 모델로 전환할 수 있다.
+현재 기본 제어 모델은 `keep_v39_17d`다. 모델 파일 이름은 `keep_v39_17d_model.zip`이고, Stable-Baselines3 2.8.0의 PPO 형식으로 저장되어 있다. 초기 active model은 `.env`의 `PINGPONG_POLICY_MODEL_PATH`로 정하지만, 실행 중에는 웹 UI의 Action Dimension 섹션에서 `rl/artifacts` 아래의 dimension별 대표 PPO 모델로 전환할 수 있다.
 
 중요한 구분이 있다. PPO는 학습 알고리즘이고, 학습된 제어기는 PPO가 최적화한 policy network다. 흔히 "PPO 모델"이라고 부르지만, 웹에서 매 step action을 계산하는 것은 그 안의 actor, 즉 policy 쪽 네트워크다.
 
@@ -163,7 +163,7 @@ MuJoCo state
 }
 ```
 
-`rl1`, `rl2`, `rl3`처럼 실험 시점별로 나뉜 legacy run은 action dimension별로 묶고, 같은 dimension 안에서는 오래된 run부터 `V1`, `V2`를 부여한다. 현재 UI에는 각 dimension에서 가장 최신 대표 모델 하나만 노출한다. 버튼은 `17D`, `5D`, `3D`처럼 dimension을 크게 보여주고, 보조 라벨로 `V11`, `V27`, `V9` 같은 내부 순번만 보여준다. 원본 run 이름과 path는 내부 metadata로만 유지하고 선택 UI에는 노출하지 않는다.
+`rl1`, `rl2`, `rl3`처럼 실험 시점별로 나뉜 legacy run은 action dimension별로 묶고, 같은 dimension 안에서는 오래된 run부터 `V1`, `V2`를 부여한다. 현재 UI에는 각 dimension에서 대표 모델 하나만 노출한다. 대부분은 최신 run을 쓰지만, 5D는 summary/episode CSV 기준 성능이 더 좋은 `ppo_keepup_v9`를 대표로 쓴다. 버튼은 `17D`, `5D`, `3D`처럼 dimension을 크게 보여주고, 보조 라벨로 `V11`, `V13`, `V9` 같은 내부 순번만 보여준다. 원본 run 이름과 path는 내부 metadata로만 유지하고 선택 UI에는 노출하지 않는다.
 
 3D/5D legacy 모델은 최신 환경보다 policy observation 길이가 짧다. 서버는 모델 ZIP metadata의 observation shape를 보고, 최신 35D+ observation에서 예전 policy가 학습 때 보던 26D/29D 필드만 추려 `predict(...)`에 넣는다. 이 adapter는 웹 표시용 상태를 바꾸지 않고 policy 입력만 맞춘다.
 
