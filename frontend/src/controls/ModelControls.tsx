@@ -30,22 +30,28 @@ export function ModelControls({
         {selectedModel?.dimensionGroup ? <span>{selectedModel.dimensionGroup}</span> : null}
       </div>
       <span className="inline-status">{switchHint}</span>
-      <select
-        value={activeModelId ?? ""}
-        disabled={switching || models.length === 0}
-        aria-label="Policy model"
-        onChange={(event) => onSelect(event.target.value)}
-      >
+      <div className="model-keypad" aria-label="Policy models">
         {groups.map((group) => (
-          <optgroup key={group.label} label={`${group.label} models`}>
-            {group.models.map((model) => (
-              <option key={model.id} value={model.id} disabled={model.runtimeCompatible === false}>
-                {optionLabel(model)}
-              </option>
-            ))}
-          </optgroup>
+          <div className="model-keypad-group" key={group.label}>
+            <span>{group.label}</span>
+            <div className="model-keypad-buttons">
+              {group.models.map((model) => (
+                <button
+                  className={model.id === activeModelId ? "model-key active" : "model-key"}
+                  type="button"
+                  key={model.id}
+                  disabled={switching || model.runtimeCompatible === false}
+                  aria-pressed={model.id === activeModelId}
+                  title={model.name}
+                  onClick={() => onSelect(model.id)}
+                >
+                  {optionLabel(model)}
+                </button>
+              ))}
+            </div>
+          </div>
         ))}
-      </select>
+      </div>
       {switching ? <span className="inline-status">Loading selected model...</span> : null}
       {error ? <span className="inline-status error">{error}</span> : null}
       {selectedModel?.runtimeCompatible === false && selectedModel.compatibilityMessage ? (
@@ -101,7 +107,7 @@ function modelOrder(left: ModelMetadata, right: ModelMetadata): number {
 }
 
 function optionLabel(model: ModelMetadata): string {
-  return model.name || model.displayName;
+  return model.versionLabel || model.name || model.displayName;
 }
 
 function formatDim(value: number | null | undefined): string {

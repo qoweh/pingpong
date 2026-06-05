@@ -67,6 +67,8 @@ after sending 'websocket.close' or response already completed.
 
 처음 선택하는 모델은 policy load 때문에 대략 0.5초에서 몇 초까지 걸릴 수 있다. 같은 action dimension끼리 바꾼다고 항상 빨라지는 것은 아니고, 실제로 가장 큰 차이는 서버 runtime cache 여부에서 난다. 한 번 선택한 모델은 서버가 runtime을 캐시하므로 다시 선택할 때 훨씬 빠르다. 다른 action dimension 모델은 action label, env kwargs, policy shape가 달라서 새 runtime 준비가 더 길게 느껴질 수 있다.
 
+Live demo에서는 모델 summary에 저장된 `max_episode_steps` 값을 그대로 쓰지 않고 서버 runtime에서 `0`으로 덮어쓴다. 이 환경에서 `0`은 unlimited를 뜻하므로, 실패 조건이 발생하지 않는 한 episode step limit 때문에 자동 reset되지 않는다.
+
 ## 홈서버 기준 추정
 
 i5-8400 6코어, 16GB RAM 서버에서 이전 구조는 부드러운 live 시뮬레이션 기준 3-6명 정도가 안전권이었다. 현재 shared live 구조는 서버 측 MuJoCo/PPO 계산이 접속자 수에 거의 비례하지 않으므로, 병목은 CPU보다 WebSocket 전송량과 초기 정적 asset 다운로드 쪽으로 옮겨간다.

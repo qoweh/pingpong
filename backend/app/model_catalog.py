@@ -24,6 +24,23 @@ SUPPORTED_ACTION_MODES = {
     "position_contact_frame_velocity_tilt_lateral_apex_residual",
     "position_contact_frame_velocity_tilt_lateral_apex_tracking_residual",
 }
+CATALOG_EXCLUDED_RUN_NAMES = {
+    "keep1_v40_17d_v39_polish",
+    "pmk_cf_self_rally_v29_first_contact_chase_sector",
+}
+CATALOG_VISIBLE_RUN_NAMES = {
+    "keep_v39_17d",
+    "keep1_v38_17d_mid_curriculum_recover",
+    "keep1_v37_17d_wide_curriculum_guarded",
+    "keep1_v30",
+    "pmk_cf_self_rally_v27_fast",
+    "pmk_cf_self_rally_v18",
+    "pmk_cf_self_rally_v17",
+    "pmk_cf_self_rally_v16",
+    "pmk_cf_self_rally_v5",
+    "ppo_keepup_v17",
+    "ppo_keepup_v7",
+}
 
 
 @dataclass(frozen=True)
@@ -47,6 +64,8 @@ def build_model_catalog(
     records: dict[str, ModelRecord] = {}
     used_ids: set[str] = set()
     for path in sorted(paths.values(), key=lambda item: sort_key(item, project_root)):
+        if infer_run_name(path) in CATALOG_EXCLUDED_RUN_NAMES:
+            continue
         record = build_model_record(path, project_root, resolve_env_kwargs, used_ids)
         records[record.id] = record
         used_ids.add(record.id)
@@ -511,6 +530,11 @@ def assigned_record_sort_key(record: ModelRecord) -> tuple[int, int, str]:
         -int(metadata.get("sortVersion") or 0),
         str(metadata.get("displayName") or record.display_name),
     )
+
+
+def is_catalog_visible(record: ModelRecord) -> bool:
+    raw_run_name = str(record.metadata.get("rawRunName") or record.id)
+    return raw_run_name in CATALOG_VISIBLE_RUN_NAMES
 
 
 def sort_dimension_value(value: Any) -> int:

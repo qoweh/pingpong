@@ -163,7 +163,7 @@ MuJoCo state
 }
 ```
 
-`rl1`, `rl2`, `rl3`처럼 실험 시점별로 나뉜 legacy run은 action dimension별로 묶고, 같은 dimension 안에서는 오래된 run부터 `V1`, `V2`를 부여한다. UI에서는 가장 최신 버전이 위에 오므로 예를 들어 `keep1_v36_17d_balanced_xyz012`는 `17D V8`처럼 보인다. 원본 run 이름과 path는 내부 metadata로만 유지하고 선택 UI에는 노출하지 않는다.
+`rl1`, `rl2`, `rl3`처럼 실험 시점별로 나뉜 legacy run은 action dimension별로 묶고, 같은 dimension 안에서는 오래된 run부터 `V1`, `V2`를 부여한다. UI에서는 각 dimension 안에서 성능이 비슷한 모델을 대표 모델로 줄이고, 버튼에는 `V11`, `V10`처럼 version만 표시한다. 원본 run 이름과 path는 내부 metadata로만 유지하고 선택 UI에는 노출하지 않는다.
 
 ## Policy output/action 시각화
 

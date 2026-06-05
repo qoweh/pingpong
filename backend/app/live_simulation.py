@@ -16,7 +16,7 @@ import numpy as np
 from stable_baselines3 import PPO
 
 from .ball_spawn import build_ball_spawn_config, parse_ball_spawn_options
-from .model_catalog import ModelRecord, build_model_catalog, with_loaded_policy_metadata
+from .model_catalog import ModelRecord, build_model_catalog, is_catalog_visible, with_loaded_policy_metadata
 from .settings import AppSettings
 
 
@@ -121,6 +121,8 @@ class LiveSimulationService:
 
         models = []
         for record in self.model_catalog.values():
+            if record.id != active_model_id and not is_catalog_visible(record):
+                continue
             metadata = active_metadata if record.id == active_model_id else record.metadata
             models.append(metadata)
 
@@ -132,7 +134,7 @@ class LiveSimulationService:
 
     def select_model(self, model_id: str) -> dict[str, Any]:
         record = self.model_catalog.get(model_id)
-        if record is None:
+        if record is None or not is_catalog_visible(record):
             raise KeyError(model_id)
 
         started_at = time.perf_counter()
@@ -155,6 +157,7 @@ class LiveSimulationService:
     def _resolve_env_kwargs(self, model_path: Path) -> dict[str, Any]:
         env_kwargs = dict(self.resolve_env_kwargs_for_model(model_path))
         env_kwargs["scene_path"] = str(self.settings.scene_path)
+        env_kwargs["max_episode_steps"] = 0
         return self._supported_env_kwargs(env_kwargs)
 
     def _supported_env_kwargs(self, env_kwargs: dict[str, Any]) -> dict[str, Any]:
@@ -205,7 +208,7 @@ class LiveSimulationService:
             ball_spawn_config=ball_spawn_config,
             policy=policy,
             policy_lock=threading.Lock(),
-            policy_message=f"Model: {metadata.get('displayName') or metadata.get('name') or record.id}",
+            policy_message=f"Model: {metadata.get('name') or record.id}",
         )
 
     @staticmethod
