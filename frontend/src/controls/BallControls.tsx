@@ -1,7 +1,14 @@
 import { RotateCcw } from "lucide-react";
+import { useState } from "react";
 
 import type { BallSpawnConfig, BallSpawnSettings } from "../simulation/types";
 import { DEFAULT_BALL_SPAWN_CONFIG } from "../simulation/types";
+import {
+  clampBallSpawnSettings,
+  isWithinTrainedBallSpawnRange,
+  rangeBounds,
+  type BallSpawnClampMode
+} from "../simulation/ballSpawnConfig";
 
 interface BallControlsProps {
   value: BallSpawnSettings;
@@ -24,31 +31,52 @@ const AXES: Array<{
 
 export function BallControls({ value, config, onChange }: BallControlsProps) {
   const activeConfig = config ?? DEFAULT_BALL_SPAWN_CONFIG;
+  const [useExtendedRange, setUseExtendedRange] = useState(false);
+  const clampMode: BallSpawnClampMode = useExtendedRange ? "extended" : "trained";
+  const trained = isWithinTrainedBallSpawnRange(value, activeConfig);
 
   const updateValue = (key: keyof BallSpawnSettings, rawValue: number) => {
     if (!Number.isFinite(rawValue)) {
       return;
     }
-    const range = activeConfig.ranges[key];
-    const nextValue = Math.min(Math.max(rawValue, range.min), range.max);
-    onChange({ ...value, [key]: nextValue });
+    onChange(clampBallSpawnSettings({ ...value, [key]: rawValue }, activeConfig, clampMode));
   };
 
   return (
     <div className="control-section">
-      <h2>Ball Start</h2>
+      <div className="section-heading">
+        <h2>Ball Start</h2>
+        <span className={trained ? "range-badge trained" : "range-badge extended"}>
+          {trained ? "Trained range" : "Extended range"}
+        </span>
+      </div>
+      <label className="toggle-row compact">
+        <input
+          type="checkbox"
+          checked={useExtendedRange}
+          onChange={(event) => {
+            const nextMode: BallSpawnClampMode = event.target.checked ? "extended" : "trained";
+            setUseExtendedRange(event.target.checked);
+            onChange(clampBallSpawnSettings(value, activeConfig, nextMode));
+          }}
+        />
+        <span>Stress range</span>
+      </label>
       {AXES.map((axis) => {
         const range = activeConfig.ranges[axis.key];
+        const bounds = rangeBounds(range, clampMode);
         const trainedMin = range.trainedMin ?? range.min;
         const trainedMax = range.trainedMax ?? range.max;
-        const title = `trained ${trainedMin.toFixed(3)}..${trainedMax.toFixed(3)} ${axis.unit}`;
+        const title = `trained ${trainedMin.toFixed(3)}..${trainedMax.toFixed(3)} ${axis.unit}; tested ${range.min.toFixed(
+          3
+        )}..${range.max.toFixed(3)} ${axis.unit}`;
         return (
           <label className="range-row" key={axis.key} title={title}>
             <span>{axis.label}</span>
             <input
               type="range"
-              min={range.min}
-              max={range.max}
+              min={bounds.min}
+              max={bounds.max}
               step={range.step}
               value={value[axis.key]}
               onChange={(event) => {
@@ -58,8 +86,8 @@ export function BallControls({ value, config, onChange }: BallControlsProps) {
             <input
               className="range-number"
               type="number"
-              min={range.min}
-              max={range.max}
+              min={bounds.min}
+              max={bounds.max}
               step={range.step}
               value={value[axis.key].toFixed(3)}
               aria-label={axis.label}
@@ -71,7 +99,11 @@ export function BallControls({ value, config, onChange }: BallControlsProps) {
         );
       })}
       <div className="button-row">
-        <button className="action-button muted full" type="button" onClick={() => onChange(activeConfig.defaults)}>
+        <button
+          className="action-button muted full"
+          type="button"
+          onClick={() => onChange(clampBallSpawnSettings(activeConfig.defaults, activeConfig, clampMode))}
+        >
           <RotateCcw size={16} />
           <span>Reset Ball</span>
         </button>

@@ -6,7 +6,7 @@ from contextlib import asynccontextmanager
 from pathlib import Path
 from typing import Any
 
-from fastapi import FastAPI, WebSocket, WebSocketDisconnect
+from fastapi import Body, FastAPI, HTTPException, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
@@ -50,16 +50,33 @@ async def config() -> dict[str, Any]:
     return app.state.simulation.config_payload()
 
 
+@app.get("/api/models")
+async def models() -> dict[str, Any]:
+    return app.state.simulation.models_payload()
+
+
+@app.post("/api/models/select")
+async def select_model(payload: dict[str, Any] = Body(...)) -> dict[str, Any]:
+    model_id = payload.get("modelId") or payload.get("id") or payload.get("model")
+    if not isinstance(model_id, str) or not model_id:
+        raise HTTPException(status_code=400, detail="modelId is required.")
+
+    try:
+        return await asyncio.to_thread(app.state.simulation.select_model, model_id)
+    except KeyError as exc:
+        raise HTTPException(status_code=404, detail=f"Unknown model: {model_id}") from exc
+
+
 @app.websocket("/api/live")
 async def live(websocket: WebSocket) -> None:
     await websocket.accept()
     simulation = app.state.simulation
     command_state = LiveCommandState()
     session = await asyncio.to_thread(simulation.create_session)
-    receiver = asyncio.create_task(receive_commands(websocket, command_state, simulation.ball_spawn_config))
+    receiver = asyncio.create_task(receive_commands(websocket, command_state, session.ball_spawn_config))
 
     try:
-        await websocket.send_json({"type": "ready", "config": simulation.config_payload()})
+        await websocket.send_json({"type": "ready", "config": simulation.config_payload(session.runtime)})
         await websocket.send_json(session.frame(reset=True))
 
         while True:

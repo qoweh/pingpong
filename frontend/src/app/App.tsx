@@ -1,17 +1,22 @@
-import { ExternalLink, PanelRightClose, PanelRightOpen } from "lucide-react";
-import { lazy, Suspense, useCallback, useEffect, useState } from "react";
+import { ExternalLink, PanelRightClose, PanelRightOpen, RefreshCw } from "lucide-react";
+import { lazy, Suspense, useCallback, useEffect, useMemo, useState } from "react";
 
+import { ActionVisualizer } from "../components/ActionVisualizer";
 import { BallControls } from "../controls/BallControls";
 import { CameraControls } from "../controls/CameraControls";
+import { ModelControls } from "../controls/ModelControls";
 import { PlaybackControls } from "../controls/PlaybackControls";
 import { VisualizationToggles } from "../controls/VisualizationToggles";
 import { DocsPage } from "./DocsPage";
 import { clampBallSpawnSettings, parseBallSpawnConfig } from "../simulation/ballSpawnConfig";
+import { parseModelsPayload } from "../simulation/modelConfig";
 import type {
   BallSpawnConfig,
   BallSpawnSettings,
   CameraMode,
   LoadingProgress,
+  ModelsPayload,
+  ModelMetadata,
   PlaybackState,
   SimulationSnapshot,
   VisualizationSettings
@@ -34,12 +39,21 @@ export function App() {
   const [visualization, setVisualization] = useState<VisualizationSettings>(DEFAULT_VISUALIZATION);
   const [ballSpawn, setBallSpawn] = useState<BallSpawnSettings>(DEFAULT_BALL_SPAWN);
   const [ballSpawnConfig, setBallSpawnConfig] = useState<BallSpawnConfig>(DEFAULT_BALL_SPAWN_CONFIG);
+  const [models, setModels] = useState<ModelMetadata[]>([]);
+  const [activeModelId, setActiveModelId] = useState<string | null>(null);
+  const [modelSwitching, setModelSwitching] = useState(false);
+  const [modelError, setModelError] = useState<string | null>(null);
   const [snapshot, setSnapshot] = useState<SimulationSnapshot>(ZERO_SNAPSHOT);
   const [status, setStatus] = useState("Preparing simulation");
   const [loadingProgress, setLoadingProgress] = useState<LoadingProgress>(INITIAL_LOADING_PROGRESS);
   const [resetSignal, setResetSignal] = useState(0);
   const [ballSpawnSignal, setBallSpawnSignal] = useState(0);
+  const [canvasKey, setCanvasKey] = useState(0);
   const [controlsOpen, setControlsOpen] = useState(true);
+  const selectedModel = useMemo(
+    () => models.find((model) => model.id === activeModelId) ?? models[0] ?? null,
+    [activeModelId, models]
+  );
   const ready = snapshot.mujocoLoaded && snapshot.policyLoaded;
   const ballHeightAboveRacket = snapshot.ball.position[2] - snapshot.racketPosition[2];
   const heightText = ready ? `${ballHeightAboveRacket.toFixed(2)}m` : "--";
@@ -56,6 +70,54 @@ export function App() {
     setBallSpawn(value);
     setBallSpawnSignal((signal) => signal + 1);
   }, []);
+
+  const applyModelsPayload = useCallback((payload: ModelsPayload) => {
+    setModels(payload.models);
+    setActiveModelId(payload.activeModel);
+    const activeModel = payload.models.find((model) => model.id === payload.activeModel) ?? payload.models[0];
+    if (activeModel?.ballSpawn) {
+      setBallSpawnConfig(activeModel.ballSpawn);
+      setBallSpawn((current) => clampBallSpawnSettings(current, activeModel.ballSpawn ?? DEFAULT_BALL_SPAWN_CONFIG, "trained"));
+    }
+  }, []);
+
+  const selectModel = useCallback(
+    async (modelId: string) => {
+      if (!modelId || modelId === activeModelId || modelSwitching) {
+        return;
+      }
+
+      setModelError(null);
+      setModelSwitching(true);
+      setPlayback("paused");
+      setStatus("Loading selected model");
+      setLoadingProgress({ percent: 94, message: "Loading selected model" });
+
+      try {
+        const response = await fetch("/api/models/select", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ modelId })
+        });
+        if (!response.ok) {
+          throw new Error(`Model switch failed (${response.status})`);
+        }
+        const parsed = parseModelsPayload(await response.json());
+        if (!parsed) {
+          throw new Error("Model response was not readable.");
+        }
+        applyModelsPayload(parsed);
+        setSnapshot({ ...ZERO_SNAPSHOT, policyMessage: "Connecting to control model" });
+        setCanvasKey((key) => key + 1);
+        setPlayback("playing");
+      } catch (error) {
+        setModelError(error instanceof Error ? error.message : "Model switch failed.");
+      } finally {
+        setModelSwitching(false);
+      }
+    },
+    [activeModelId, applyModelsPayload, modelSwitching]
+  );
 
   const updateStatus = useCallback((message: string) => {
     setStatus(message);
@@ -74,15 +136,24 @@ export function App() {
 
     async function loadConfig() {
       try {
-        const response = await fetch("/api/config");
-        if (!response.ok) {
+        const modelsResponse = await fetch("/api/models");
+        if (modelsResponse.ok) {
+          const parsed = parseModelsPayload(await modelsResponse.json());
+          if (parsed && !cancelled) {
+            applyModelsPayload(parsed);
+            return;
+          }
+        }
+
+        const configResponse = await fetch("/api/config");
+        if (!configResponse.ok) {
           return;
         }
-        const payload = (await response.json()) as { ballSpawn?: unknown };
+        const payload = (await configResponse.json()) as { ballSpawn?: unknown };
         const parsedConfig = parseBallSpawnConfig(payload.ballSpawn);
         if (!cancelled) {
           setBallSpawnConfig(parsedConfig);
-          setBallSpawn((current) => clampBallSpawnSettings(current, parsedConfig));
+          setBallSpawn((current) => clampBallSpawnSettings(current, parsedConfig, "trained"));
         }
       } catch {
         return;
@@ -94,7 +165,7 @@ export function App() {
     return () => {
       cancelled = true;
     };
-  }, [isDocsPage]);
+  }, [applyModelsPayload, isDocsPage]);
 
   return (
     <div className="app-shell">
@@ -121,6 +192,7 @@ export function App() {
               <section className="viewer-pane" aria-label="Simulation viewer">
                 <Suspense fallback={<div className="simulation-canvas" />}>
                   <SimulationCanvas
+                    key={canvasKey}
                     playback={playback}
                     cameraMode={cameraMode}
                     visualization={visualization}
@@ -155,6 +227,14 @@ export function App() {
 
                 {controlsOpen ? (
                   <aside className="control-pane" aria-label="Simulation controls">
+                    <ModelControls
+                      models={models}
+                      activeModelId={activeModelId}
+                      selectedModel={selectedModel}
+                      switching={modelSwitching}
+                      error={modelError}
+                      onSelect={selectModel}
+                    />
                     <PlaybackControls playback={playback} onPlaybackChange={setPlayback} onReset={reset} />
 
                     <div className="metrics-grid">
@@ -176,9 +256,15 @@ export function App() {
                       </div>
                     </div>
 
-                    <BallControls value={ballSpawn} config={ballSpawnConfig} onChange={updateBallSpawn} />
+                    <BallControls
+                      key={activeModelId ?? "ball-controls"}
+                      value={ballSpawn}
+                      config={ballSpawnConfig}
+                      onChange={updateBallSpawn}
+                    />
                     <CameraControls value={cameraMode} onChange={setCameraMode} />
                     <VisualizationToggles value={visualization} onChange={setVisualization} />
+                    <ActionVisualizer action={snapshot.action} model={selectedModel} />
 
                     <div className="policy-note">{snapshot.policyMessage}</div>
                   </aside>
@@ -227,6 +313,12 @@ function LoadingOverlay({
           </span>
           <span className={snapshot.policyLoaded ? "done" : ""}>{snapshot.policyMessage}</span>
           <span>First uncached load can take several seconds on a server.</span>
+        </div>
+        <div className="loading-actions">
+          <button className="loading-refresh" type="button" onClick={() => window.location.reload()} aria-label="Refresh page">
+            <RefreshCw size={15} />
+            <span>Refresh</span>
+          </button>
         </div>
       </div>
     </div>

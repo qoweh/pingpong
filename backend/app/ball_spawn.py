@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from math import isfinite
+from math import hypot, isfinite
 from pathlib import Path
 from typing import Any
 
@@ -31,6 +31,7 @@ FALLBACK_BALL_SPAWN_CONFIG: BallSpawnConfig = {
         key: {**value, "trainedMin": value["min"], "trainedMax": value["max"]}
         for key, value in FALLBACK_SPAWN_RANGES.items()
     },
+    "xyConstraint": {"sampling": "square"},
 }
 
 V39_TESTED_RANGES = {
@@ -46,6 +47,7 @@ V39_TESTED_RANGES = {
 def build_ball_spawn_config(env_kwargs: dict[str, Any], model_path: Path) -> BallSpawnConfig:
     default_z = finite_float(env_kwargs.get("ball_height"), DEFAULT_BALL_SPAWN["zOffset"])
     xy_range = abs(finite_float(env_kwargs.get("reset_xy_range"), 0.0))
+    xy_sampling = str(env_kwargs.get("reset_xy_sampling") or "square")
     velocity_xy_range = abs(finite_float(env_kwargs.get("reset_velocity_xy_range"), 0.0))
     z_min, z_max = height_bounds(env_kwargs, default_z)
     velocity_z_min, velocity_z_max = ordered_pair(env_kwargs.get("reset_velocity_z_range"), (-0.0, 0.0))
@@ -59,6 +61,7 @@ def build_ball_spawn_config(env_kwargs: dict[str, Any], model_path: Path) -> Bal
         "velocityZ": (velocity_z_min, velocity_z_max),
     }
     merged_ranges = dict(trained_ranges)
+    tested_xy_radius = xy_range
 
     if is_keep_v39_model(model_path):
         merged_ranges = {
@@ -68,6 +71,7 @@ def build_ball_spawn_config(env_kwargs: dict[str, Any], model_path: Path) -> Bal
             )
             for key in trained_ranges
         }
+        tested_xy_radius = max(abs(V39_TESTED_RANGES["xOffset"][0]), abs(V39_TESTED_RANGES["xOffset"][1]))
 
     ranges = {
         key: {
@@ -86,6 +90,11 @@ def build_ball_spawn_config(env_kwargs: dict[str, Any], model_path: Path) -> Bal
             "zOffset": clamp_float(default_z, ranges["zOffset"]["min"], ranges["zOffset"]["max"], default_z),
         },
         "ranges": ranges,
+        "xyConstraint": {
+            "sampling": xy_sampling,
+            "trainedRadius": float(xy_range) if xy_sampling == "disk" else None,
+            "testedRadius": float(tested_xy_radius) if xy_sampling == "disk" else None,
+        },
     }
 
 
@@ -99,6 +108,7 @@ def parse_ball_spawn_options(message: dict[str, Any], config: BallSpawnConfig) -
     velocity_x = clamp_axis(message, ranges, defaults, "velocityX")
     velocity_y = clamp_axis(message, ranges, defaults, "velocityY")
     velocity_z = clamp_axis(message, ranges, defaults, "velocityZ")
+    x_offset, y_offset = clamp_xy_radius(x_offset, y_offset, config)
     return {
         "ball_height": z_offset,
         "ball_xy_offset": [x_offset, y_offset],
@@ -119,6 +129,23 @@ def clamp_axis(
         finite_float(axis_range.get("max"), FALLBACK_BALL_SPAWN_CONFIG["ranges"][key]["max"]),
         finite_float(defaults.get(key), DEFAULT_BALL_SPAWN[key]),
     )
+
+
+def clamp_xy_radius(x_offset: float, y_offset: float, config: BallSpawnConfig) -> tuple[float, float]:
+    xy_constraint = config.get("xyConstraint")
+    if not isinstance(xy_constraint, dict) or xy_constraint.get("sampling") != "disk":
+        return x_offset, y_offset
+
+    radius = finite_float(xy_constraint.get("testedRadius"), 0.0)
+    if radius <= 0.0:
+        radius = max(abs(x_offset), abs(y_offset))
+
+    distance = hypot(x_offset, y_offset)
+    if distance <= radius or distance <= 0.0:
+        return x_offset, y_offset
+
+    scale = radius / distance
+    return x_offset * scale, y_offset * scale
 
 
 def height_bounds(env_kwargs: dict[str, Any], default_z: float) -> tuple[float, float]:

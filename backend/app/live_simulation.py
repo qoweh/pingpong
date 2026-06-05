@@ -10,6 +10,7 @@ import numpy as np
 from stable_baselines3 import PPO
 
 from .ball_spawn import build_ball_spawn_config
+from .model_catalog import ModelRecord, build_model_catalog, with_loaded_policy_metadata
 from .settings import AppSettings
 
 
@@ -22,6 +23,33 @@ class LiveCommandState:
     ball_spawn_options: dict[str, Any] | None = None
 
 
+@dataclass
+class RuntimeModel:
+    record: ModelRecord
+    env_kwargs: dict[str, Any]
+    ball_spawn_config: dict[str, Any]
+    policy: PPO
+    policy_lock: threading.Lock
+    policy_message: str
+    control_dt: float = 0.02
+
+    @property
+    def model_path(self) -> Path:
+        return self.record.path
+
+    @property
+    def metadata(self) -> dict[str, Any]:
+        return self.record.metadata
+
+    def predict(self, observation: Any, deterministic: bool) -> np.ndarray:
+        with self.policy_lock:
+            action, _ = self.policy.predict(
+                observation,
+                deterministic=deterministic,
+            )
+        return np.asarray(action, dtype=float)
+
+
 class LiveSimulationService:
     def __init__(self, settings: AppSettings) -> None:
         self.settings = settings
@@ -31,34 +59,109 @@ class LiveSimulationService:
         from pingpong_rl2.utils import resolve_env_kwargs_for_model
 
         self.env_class = PingPongKeepUpGymEnv
-        self.env_kwargs = resolve_env_kwargs_for_model(settings.model_path)
-        self.env_kwargs["scene_path"] = str(settings.scene_path)
-        self.ball_spawn_config = build_ball_spawn_config(self.env_kwargs, settings.model_path)
-        self.policy = PPO.load(str(settings.model_path), device="cpu")
-        self.policy_lock = threading.Lock()
-        self.policy_message = f"Model: {display_model_name(settings.model_path)}"
-        self.control_dt = 0.02
+        self.resolve_env_kwargs_for_model = resolve_env_kwargs_for_model
+        self.model_catalog = build_model_catalog(settings.project_root, settings.model_path, self._resolve_env_kwargs)
+        self._runtime_lock = threading.Lock()
+        self.active_runtime = self._load_runtime_for_path(settings.model_path)
 
     def create_session(self) -> "LiveSimulationSession":
-        return LiveSimulationSession(self)
+        with self._runtime_lock:
+            runtime = self.active_runtime
+        return LiveSimulationSession(self, runtime)
 
-    def predict(self, observation: Any) -> np.ndarray:
-        with self.policy_lock:
-            action, _ = self.policy.predict(
-                observation,
-                deterministic=self.settings.deterministic_policy,
-            )
-        return np.asarray(action, dtype=float)
+    @property
+    def ball_spawn_config(self) -> dict[str, Any]:
+        with self._runtime_lock:
+            return self.active_runtime.ball_spawn_config
 
-    def config_payload(self) -> dict[str, Any]:
+    def config_payload(self, runtime: RuntimeModel | None = None) -> dict[str, Any]:
+        active_runtime = runtime
+        if active_runtime is None:
+            with self._runtime_lock:
+                active_runtime = self.active_runtime
         return {
-            "model": portable_path(self.settings.model_path, self.settings.project_root),
+            "model": portable_path(active_runtime.model_path, self.settings.project_root),
+            "modelId": active_runtime.record.id,
             "scene": portable_path(self.settings.scene_path, self.settings.project_root),
             "deterministic": self.settings.deterministic_policy,
             "seed": self.settings.seed,
-            "controlDt": self.control_dt,
-            "ballSpawn": self.ball_spawn_config,
+            "controlDt": active_runtime.control_dt,
+            "ballSpawn": active_runtime.ball_spawn_config,
+            "modelInfo": active_runtime.metadata,
         }
+
+    def models_payload(self) -> dict[str, Any]:
+        with self._runtime_lock:
+            active_runtime = self.active_runtime
+            active_model_id = active_runtime.record.id
+            active_metadata = active_runtime.metadata
+
+        models = []
+        for record in self.model_catalog.values():
+            metadata = active_metadata if record.id == active_model_id else record.metadata
+            models.append(metadata)
+
+        models.sort(key=lambda item: model_sort_key(item, active_model_id))
+        return {
+            "activeModel": active_model_id,
+            "models": models,
+        }
+
+    def select_model(self, model_id: str) -> dict[str, Any]:
+        record = self.model_catalog.get(model_id)
+        if record is None:
+            raise KeyError(model_id)
+
+        runtime = self._load_runtime(record)
+        with self._runtime_lock:
+            self.active_runtime = runtime
+        return {
+            **self.models_payload(),
+            "config": self.config_payload(runtime),
+        }
+
+    def _resolve_env_kwargs(self, model_path: Path) -> dict[str, Any]:
+        env_kwargs = dict(self.resolve_env_kwargs_for_model(model_path))
+        env_kwargs["scene_path"] = str(self.settings.scene_path)
+        return env_kwargs
+
+    def _load_runtime_for_path(self, model_path: Path) -> RuntimeModel:
+        record = next((item for item in self.model_catalog.values() if item.path == model_path.resolve()), None)
+        if record is None:
+            self.model_catalog = build_model_catalog(self.settings.project_root, model_path, self._resolve_env_kwargs)
+            record = next(item for item in self.model_catalog.values() if item.path == model_path.resolve())
+        return self._load_runtime(record)
+
+    def _load_runtime(self, record: ModelRecord) -> RuntimeModel:
+        env_kwargs = self._resolve_env_kwargs(record.path)
+        ball_spawn_config = build_ball_spawn_config(env_kwargs, record.path)
+        policy = PPO.load(str(record.path), device="cpu")
+        metadata = with_loaded_policy_metadata(
+            {
+                **record.metadata,
+                "ballSpawn": ball_spawn_config,
+                "trainedRanges": trained_ranges(ball_spawn_config),
+                "testedRanges": tested_ranges(ball_spawn_config),
+            },
+            policy,
+        )
+        enriched_record = ModelRecord(
+            id=record.id,
+            name=record.name,
+            display_name=record.display_name,
+            source=record.source,
+            path=record.path,
+            metadata=metadata,
+        )
+        self.model_catalog[record.id] = enriched_record
+        return RuntimeModel(
+            record=enriched_record,
+            env_kwargs=env_kwargs,
+            ball_spawn_config=ball_spawn_config,
+            policy=policy,
+            policy_lock=threading.Lock(),
+            policy_message=f"Model: {metadata.get('displayName') or metadata.get('name') or record.id}",
+        )
 
     @staticmethod
     def _load_rl_package(rl_source_root: Path) -> None:
@@ -73,9 +176,10 @@ class LiveSimulationService:
 
 
 class LiveSimulationSession:
-    def __init__(self, service: LiveSimulationService) -> None:
+    def __init__(self, service: LiveSimulationService, runtime: RuntimeModel) -> None:
         self.service = service
-        self.env = service.env_class(**service.env_kwargs)
+        self.runtime = runtime
+        self.env = service.env_class(**runtime.env_kwargs)
         self.episode_index = 0
         self.step_index = 0
         self.reset_pending = False
@@ -85,7 +189,11 @@ class LiveSimulationSession:
         self.last_contact: dict[str, Any] | None = None
         self.custom_reset_options: dict[str, Any] | None = None
         self.observation, self.last_info = self.env.reset(seed=service.settings.seed)
-        self.service.control_dt = self.control_dt
+        self.runtime.control_dt = self.control_dt
+
+    @property
+    def ball_spawn_config(self) -> dict[str, Any]:
+        return self.runtime.ball_spawn_config
 
     @property
     def sim(self) -> Any:
@@ -138,7 +246,7 @@ class LiveSimulationSession:
         if self.reset_pending:
             return self.reset()
 
-        action = self.service.predict(self.observation)
+        action = self.runtime.predict(self.observation, deterministic=self.service.settings.deterministic_policy)
         self.observation, reward, terminated, truncated, info = self.env.step(action)
         self.last_reward = float(reward)
         self.last_info = dict(info)
@@ -231,7 +339,8 @@ class LiveSimulationSession:
             "failureReason": info.get("failure_reason"),
             "successReason": info.get("success_reason"),
             "policyLoaded": True,
-            "policyMessage": self.service.policy_message,
+            "policyMessage": self.runtime.policy_message,
+            "modelId": self.runtime.record.id,
             "state": {
                 "qpos": numeric_list(self.sim.data.qpos),
                 "qvel": numeric_list(self.sim.data.qvel),
@@ -274,7 +383,7 @@ def numeric_vec3(values: Any) -> list[float]:
 
 def portable_path(path: Path, root: Path) -> str:
     try:
-        return str(path.relative_to(root))
+        return str(path.resolve().relative_to(root))
     except ValueError:
         return str(path)
 
@@ -286,3 +395,34 @@ def display_model_name(path: Path) -> str:
     if stem.endswith("_model"):
         return stem[:-6]
     return stem
+
+
+def trained_ranges(ball_spawn_config: dict[str, Any]) -> dict[str, dict[str, float]]:
+    ranges = ball_spawn_config.get("ranges", {})
+    return {
+        key: {
+            "min": float(value.get("trainedMin", value.get("min", 0.0))),
+            "max": float(value.get("trainedMax", value.get("max", 0.0))),
+        }
+        for key, value in ranges.items()
+        if isinstance(value, dict)
+    }
+
+
+def tested_ranges(ball_spawn_config: dict[str, Any]) -> dict[str, dict[str, float]]:
+    ranges = ball_spawn_config.get("ranges", {})
+    return {
+        key: {
+            "min": float(value.get("min", 0.0)),
+            "max": float(value.get("max", 0.0)),
+        }
+        for key, value in ranges.items()
+        if isinstance(value, dict)
+    }
+
+
+def model_sort_key(model: dict[str, Any], active_model_id: str) -> tuple[int, str, str]:
+    model_id = str(model.get("id") or "")
+    source = str(model.get("source") or "")
+    name = str(model.get("displayName") or model.get("name") or model_id)
+    return (0 if model_id == active_model_id else 1, source, name)

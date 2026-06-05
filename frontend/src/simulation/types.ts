@@ -32,13 +32,59 @@ export interface BallSpawnRange {
   step: number;
   trainedMin?: number;
   trainedMax?: number;
+  testedMin?: number;
+  testedMax?: number;
 }
 
 export type BallSpawnRanges = Record<keyof BallSpawnSettings, BallSpawnRange>;
 
+export interface BallSpawnXYConstraint {
+  sampling?: "disk" | "square" | string;
+  trainedRadius?: number | null;
+  testedRadius?: number | null;
+}
+
 export interface BallSpawnConfig {
   defaults: BallSpawnSettings;
   ranges: BallSpawnRanges;
+  xyConstraint?: BallSpawnXYConstraint;
+}
+
+export interface PolicyMetadata {
+  className?: string;
+  netArch?: unknown;
+  architecture?: string[];
+}
+
+export interface ModelMetadata {
+  id: string;
+  name: string;
+  displayName: string;
+  source: string;
+  path: string;
+  algorithm: string;
+  observationDim?: number | null;
+  actionDim?: number | null;
+  actionMode?: string | null;
+  actionLabels?: string[];
+  actionLow?: number[] | null;
+  actionHigh?: number[] | null;
+  ballSpawn?: BallSpawnConfig;
+  trainedRanges?: Record<string, { min: number; max: number }>;
+  testedRanges?: Record<string, { min: number; max: number }>;
+  trainingSummaryPath?: string | null;
+  policy?: PolicyMetadata;
+  training?: {
+    runName?: string | null;
+    timesteps?: number | null;
+    preset?: string | null;
+    seed?: number | null;
+  };
+}
+
+export interface ModelsPayload {
+  activeModel: string;
+  models: ModelMetadata[];
 }
 
 export interface BallState {
@@ -67,6 +113,8 @@ export interface SimulationSnapshot {
   mujocoLoaded: boolean;
   policyLoaded: boolean;
   policyMessage: string;
+  modelId: string | null;
+  action: number[] | null;
 }
 
 export interface LoadingProgress {
@@ -103,6 +151,11 @@ export const DEFAULT_BALL_SPAWN_CONFIG: BallSpawnConfig = {
     velocityX: { min: -0.06, max: 0.06, step: 0.005, trainedMin: -0.045, trainedMax: 0.045 },
     velocityY: { min: -0.06, max: 0.06, step: 0.005, trainedMin: -0.045, trainedMax: 0.045 },
     velocityZ: { min: -0.18, max: 0.04, step: 0.005, trainedMin: -0.14, trainedMax: 0.04 }
+  },
+  xyConstraint: {
+    sampling: "disk",
+    trainedRadius: 0.13,
+    testedRadius: 0.16
   }
 };
 
@@ -129,5 +182,7 @@ export const ZERO_SNAPSHOT: SimulationSnapshot = {
   truncated: false,
   mujocoLoaded: false,
   policyLoaded: false,
-  policyMessage: "Connecting to control model"
+  policyMessage: "Connecting to control model",
+  modelId: null,
+  action: null
 };

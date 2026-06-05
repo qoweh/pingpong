@@ -35,6 +35,7 @@ type LiveFrame = {
   failureReason: string | null;
   policyLoaded: boolean;
   policyMessage: string;
+  modelId?: string | null;
   state: {
     qpos: number[];
     qvel: number[];
@@ -51,6 +52,7 @@ type LiveFrame = {
     count: number;
     last: ContactEvent | null;
   };
+  action: number[] | null;
 };
 
 type LiveMessage =
@@ -88,6 +90,8 @@ export class MujocoWorld {
   private fallbackBallVelocity: Vec3 = [0, 0, 0];
   private racketAnchor: Vec3 = [...ZERO_SNAPSHOT.racketPosition] as Vec3;
   private policyMessage = "Connecting to control model";
+  private liveModelId: string | null = null;
+  private latestAction: number[] | null = null;
 
   async initialize(onProgress?: LoadingProgressListener): Promise<void> {
     notifyProgress(onProgress, 6, "Loading simulation engine");
@@ -167,6 +171,7 @@ export class MujocoWorld {
     this.failureReason = null;
     this.terminated = false;
     this.truncated = false;
+    this.latestAction = null;
     this.resetSerial += 1;
     this.pendingSpawn = { ...settings };
     this.flushPendingSpawn();
@@ -319,6 +324,8 @@ export class MujocoWorld {
     }
 
     this.currentEpisode = frame.episode;
+    this.liveModelId = frame.modelId ?? this.liveModelId;
+    this.latestAction = Array.isArray(frame.action) ? frame.action : this.latestAction;
     this.contactCount = frame.contact.count;
     this.contactEvent = frame.contact.event;
     this.lastContact = frame.contact.last;
@@ -339,6 +346,7 @@ export class MujocoWorld {
       this.failureReason = null;
       this.terminated = false;
       this.truncated = false;
+      this.latestAction = null;
       this.resetSerial += 1;
       return;
     }
@@ -352,6 +360,7 @@ export class MujocoWorld {
     this.failureReason = null;
     this.terminated = false;
     this.truncated = false;
+    this.latestAction = null;
     this.resetSerial += 1;
   }
 
@@ -445,7 +454,9 @@ export class MujocoWorld {
       truncated: this.truncated,
       mujocoLoaded: true,
       policyLoaded: this.liveConnected && this.liveReady,
-      policyMessage: this.policyMessage
+      policyMessage: this.policyMessage,
+      modelId: this.liveModelId,
+      action: this.latestAction
     };
   }
 
@@ -491,7 +502,9 @@ export class MujocoWorld {
       truncated: this.truncated,
       mujocoLoaded: false,
       policyLoaded: false,
-      policyMessage: this.policyMessage
+      policyMessage: this.policyMessage,
+      modelId: this.liveModelId,
+      action: this.latestAction
     };
   }
 }
