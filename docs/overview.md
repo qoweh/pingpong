@@ -1,41 +1,55 @@
 # 개요
 
-Ping-Pong Keep-Up은 Franka Panda 로봇팔에 탁구채를 부착하고, 공을 계속 위로 받아 올리는 강화학습 시뮬레이션을 웹에서 보여주는 프로젝트다.
+Ping-Pong Keep-Up은 Franka Panda 로봇팔에 탁구채를 붙인 뒤, 탁구공을 계속 받아 올리는 제어 정책을 웹에서 관찰하는 강화학습 시뮬레이션이다. 처음 볼 때는 "웹 탁구 게임"이라기보다 "물리 엔진 안에서 학습된 로봇 제어기가 어떻게 판단하는지 보여주는 도구"로 이해하는 편이 쉽다.
 
-웹 화면은 녹화 영상을 재생하는 방식이 아니다. 서버에서 원본 강화학습 환경과 제어 모델을 실행하고, 브라우저는 전달받은 시뮬레이션 상태를 MuJoCo WebAssembly 모델과 Three.js 장면에 반영한다.
+웹 화면은 녹화 영상을 재생하지 않는다. 서버가 MuJoCo 물리 환경과 Stable-Baselines3 PPO 모델을 실제로 실행하고, 브라우저는 매 순간의 로봇, 공, 라켓 상태를 받아 3D 장면으로 렌더링한다.
 
-## 목표
+## 핵심 개념 지도
 
-- 로컬 MuJoCo viewer에서 보던 환경과 최대한 같은 물리 모델을 웹에서 확인한다.
-- 로봇팔, 라켓, 공, 접촉 횟수, 높이, 카메라, 보조 시각화 기능을 한 화면에서 조작한다.
-- 모델 파일을 바꿔도 코드 여러 곳을 수정하지 않고 `.env` 설정만 바꾸도록 유지한다.
-- Apple Silicon 개발 환경과 `linux/amd64` 서버 배포 환경을 분리해서 관리한다.
-
-## 실행 구조
-
-| 영역 | 역할 |
+| 개념 | 이 프로젝트에서의 역할 |
 | --- | --- |
-| 시뮬레이션 서버 | 원본 `pingpong_rl2` 환경과 선택된 제어 모델을 실행한다. |
-| 웹 뷰어 | MuJoCo WebAssembly 모델을 로드하고 서버에서 받은 상태를 렌더링한다. |
-| 정적 자산 | MJCF, MJB, Franka mesh, 웹 번들 파일을 제공한다. |
-| 배포 프록시 | HTTPS, WebSocket 프록시, 캐시 정책을 담당한다. |
+| MuJoCo | 로봇 관절, 라켓, 공, 중력, 충돌을 계산하는 물리 엔진 |
+| 로봇팔 | 7자유도 Franka Panda arm. 학습 정책이 직접 토크를 내지 않고 라켓 목표를 보정하면, 내부 컨트롤러가 로봇 관절 명령으로 바꾼다. |
+| 강화학습 환경 | MuJoCo 상태를 관측값으로 요약하고, policy action을 적용하고, 보상과 episode 종료 여부를 계산하는 프로그램 |
+| PPO | policy network를 안정적으로 업데이트하기 위해 사용한 Stable-Baselines3의 강화학습 알고리즘 |
+| Policy network | 현재 관측값을 받아 다음 라켓 보정 action을 내는 신경망. 웹 runtime에서 실제로 action을 계산하는 부분이다. |
+| Reward function | "공을 맞혔는가"뿐 아니라 "다음 공을 다시 칠 수 있는가"를 수치로 평가하는 학습 목표 |
+| 웹 뷰어 | policy, 물리 상태, 접촉 이벤트, 공 궤적, action 값을 사람이 볼 수 있게 시각화하는 인터페이스 |
 
-브라우저 쪽 TypeScript가 학습 환경을 다시 구현하지 않는다. 학습 코드의 핵심 동작은 원본 `pingpong_rl2` 패키지를 기준으로 유지하고, 웹은 상태 표시와 사용자 조작에 집중한다.
+## 무엇을 학습했나
 
-## 주요 조작
+학습된 대상은 MuJoCo 물리 엔진도, 로봇팔의 기구 구조도 아니다. MuJoCo는 주어진 action이 들어왔을 때 다음 물리 상태를 계산하고, 로봇 모델은 관절과 링크의 구조를 제공한다.
 
-- 재생, 일시정지, 초기화
-- 공 시작 위치와 초기 속도 조절
-- 카메라 전환
-- 공 궤적, 목표 높이, 접촉 위치 표시
-- 오른쪽 조작 패널 접기/펼치기
+학습된 것은 PPO로 최적화한 `ActorCriticPolicy`의 파라미터다. 그 안에는 두 가지 네트워크가 있다.
 
-## 참고 경로
+- Actor 또는 policy: 관측값을 action으로 바꾸는 제어기
+- Critic 또는 value function: 현재 상태가 앞으로 얼마나 좋은 return을 낼지 추정하는 학습 보조 모델
 
-| 항목 | 경로 |
+웹 서비스에서 매 step 사용되는 것은 actor 쪽이다. critic은 학습 중 PPO 업데이트를 돕는 역할이 크고, 배포된 시뮬레이션에서는 주로 모델 구조를 이해할 때 의미가 있다.
+
+## 실행 루프
+
+1. MuJoCo가 현재 로봇, 라켓, 공의 위치와 속도를 가진다.
+2. 강화학습 환경이 이 물리 상태를 55차원 observation으로 요약한다.
+3. PPO policy가 observation을 받아 17차원 residual action을 낸다.
+4. residual action은 라켓의 목표 위치, 속도, 기울기, 다음 접촉 목표를 조금씩 보정한다.
+5. 내부 컨트롤러가 보정된 라켓 목표를 Franka Panda 관절 명령으로 바꾼다.
+6. MuJoCo가 0.02초 제어 구간을 작은 물리 timestep들로 적분한다.
+7. 서버가 새 상태, action, reward, contact event를 브라우저로 보낸다.
+
+이 과정을 반복하면 화면에서는 로봇이 공을 받아 올리는 것처럼 보인다. 실제로는 "관측 -> policy action -> 컨트롤러 -> 물리 적분 -> 새 관측"의 닫힌 루프가 계속 도는 것이다.
+
+## 문서 읽는 순서
+
+| 문서 | 먼저 볼 내용 |
 | --- | --- |
-| 원본 학습 프로젝트 | `/Users/pilt/project-collection/ros2/graduation-prj/pingpong_rl2` |
-| 웹 프로젝트 런타임 자산 | `rl/assets` |
-| 웹 프로젝트 모델 자산 | `rl/artifacts` |
-| vendored 학습 소스 | `backend/vendor/pingpong_rl2` |
-| 기본 모델 설정 | `.env` |
+| `simulation-environment.md` | 로봇, 공, 라켓, MuJoCo 물리 장면이 어떻게 구성되는지 |
+| `mdp-formulation.md` | observation, action, transition, episode가 코드에서 어떤 의미인지 |
+| `reward-function.md` | policy가 어떤 행동을 좋다고 학습했는지 |
+| `policy-and-training.md` | PPO, policy network, 현재 기본 모델의 학습 설정과 구조 |
+
+## 참고 문서
+
+- [MuJoCo Overview](https://mujoco.readthedocs.io/en/stable/overview.html)
+- [Stable-Baselines3 PPO](https://stable-baselines3.readthedocs.io/en/v2.8.0/modules/ppo.html)
+- [Stable-Baselines3 Policy Networks](https://stable-baselines3.readthedocs.io/en/v2.8.0/guide/custom_policy.html)
