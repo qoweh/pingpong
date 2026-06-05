@@ -1,7 +1,13 @@
 from __future__ import annotations
 
+import asyncio
+import functools
+import inspect
+import logging
 import sys
 import threading
+import time
+from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
@@ -9,9 +15,12 @@ from typing import Any
 import numpy as np
 from stable_baselines3 import PPO
 
-from .ball_spawn import build_ball_spawn_config
+from .ball_spawn import build_ball_spawn_config, parse_ball_spawn_options
 from .model_catalog import ModelRecord, build_model_catalog, with_loaded_policy_metadata
 from .settings import AppSettings
+
+
+LOGGER = logging.getLogger(__name__)
 
 
 @dataclass
@@ -55,13 +64,15 @@ class LiveSimulationService:
         self.settings = settings
         self._load_rl_package(settings.rl_source_root)
 
-        from pingpong_rl2.envs import PingPongKeepUpGymEnv
+        from pingpong_rl2.envs import PingPongKeepUpEnv, PingPongKeepUpGymEnv
         from pingpong_rl2.utils import resolve_env_kwargs_for_model
 
         self.env_class = PingPongKeepUpGymEnv
+        self.env_kwarg_names = set(inspect.signature(PingPongKeepUpEnv.__init__).parameters) - {"self"}
         self.resolve_env_kwargs_for_model = resolve_env_kwargs_for_model
         self.model_catalog = build_model_catalog(settings.project_root, settings.model_path, self._resolve_env_kwargs)
-        self._runtime_lock = threading.Lock()
+        self._runtime_lock = threading.RLock()
+        self._runtime_cache: dict[str, RuntimeModel] = {}
         self.active_runtime = self._load_runtime_for_path(settings.model_path)
 
     def create_session(self) -> "LiveSimulationSession":
@@ -112,9 +123,18 @@ class LiveSimulationService:
         if record is None:
             raise KeyError(model_id)
 
-        runtime = self._load_runtime(record)
+        started_at = time.perf_counter()
+        with self._runtime_lock:
+            was_cached = record.id in self._runtime_cache
+        runtime = self._runtime_for_record(record)
         with self._runtime_lock:
             self.active_runtime = runtime
+        LOGGER.info(
+            "Selected model %s in %.3fs (%s)",
+            model_id,
+            time.perf_counter() - started_at,
+            "cached runtime" if was_cached else "loaded runtime",
+        )
         return {
             **self.models_payload(),
             "config": self.config_payload(runtime),
@@ -123,14 +143,27 @@ class LiveSimulationService:
     def _resolve_env_kwargs(self, model_path: Path) -> dict[str, Any]:
         env_kwargs = dict(self.resolve_env_kwargs_for_model(model_path))
         env_kwargs["scene_path"] = str(self.settings.scene_path)
-        return env_kwargs
+        return self._supported_env_kwargs(env_kwargs)
+
+    def _supported_env_kwargs(self, env_kwargs: dict[str, Any]) -> dict[str, Any]:
+        return {key: value for key, value in env_kwargs.items() if key in self.env_kwarg_names}
 
     def _load_runtime_for_path(self, model_path: Path) -> RuntimeModel:
         record = next((item for item in self.model_catalog.values() if item.path == model_path.resolve()), None)
         if record is None:
             self.model_catalog = build_model_catalog(self.settings.project_root, model_path, self._resolve_env_kwargs)
             record = next(item for item in self.model_catalog.values() if item.path == model_path.resolve())
-        return self._load_runtime(record)
+        return self._runtime_for_record(record)
+
+    def _runtime_for_record(self, record: ModelRecord) -> RuntimeModel:
+        with self._runtime_lock:
+            cached = self._runtime_cache.get(record.id)
+            if cached is not None:
+                return cached
+
+            runtime = self._load_runtime(record)
+            self._runtime_cache[record.id] = runtime
+            return runtime
 
     def _load_runtime(self, record: ModelRecord) -> RuntimeModel:
         env_kwargs = self._resolve_env_kwargs(record.path)
@@ -173,6 +206,129 @@ class LiveSimulationService:
                 "or set PINGPONG_RL_SOURCE_ROOT."
             )
         sys.path.insert(0, str(source_path))
+
+
+class LiveSimulationHub:
+    def __init__(self, service: LiveSimulationService) -> None:
+        self.service = service
+        self.command_state = LiveCommandState()
+        self.session: LiveSimulationSession | None = None
+        self.subscribers: set[asyncio.Queue[dict[str, Any]]] = set()
+        self.last_frame: dict[str, Any] | None = None
+        self._lock = asyncio.Lock()
+        self._task: asyncio.Task[None] | None = None
+        self._executor = ThreadPoolExecutor(max_workers=1, thread_name_prefix="pingpong-live")
+
+    async def start(self) -> None:
+        if self._task is None or self._task.done():
+            self._task = asyncio.create_task(self._run(), name="pingpong-live-hub")
+
+    async def stop(self) -> None:
+        if self._task is not None:
+            self._task.cancel()
+            await asyncio.gather(self._task, return_exceptions=True)
+            self._task = None
+        self._executor.shutdown(wait=False, cancel_futures=True)
+
+    async def subscribe(self) -> asyncio.Queue[dict[str, Any]]:
+        await self.start()
+        queue: asyncio.Queue[dict[str, Any]] = asyncio.Queue(maxsize=3)
+        async with self._lock:
+            session = await self._ensure_session_locked()
+            self.subscribers.add(queue)
+            offer_queue_message(queue, {"type": "ready", "config": self.service.config_payload(session.runtime)})
+            frame = self.last_frame or await self._run_sync(session.frame)
+            offer_queue_message(queue, frame)
+        return queue
+
+    async def unsubscribe(self, queue: asyncio.Queue[dict[str, Any]]) -> None:
+        self.subscribers.discard(queue)
+
+    async def handle_message(self, message: dict[str, Any]) -> None:
+        message_type = message.get("type")
+        async with self._lock:
+            if message_type == "reset":
+                self.command_state.reset_requested = True
+            elif message_type == "playback":
+                playback = message.get("playback")
+                if playback in {"playing", "paused"}:
+                    self.command_state.playback = playback
+            elif message_type == "spawnBall":
+                self.command_state.ball_spawn_options = parse_ball_spawn_options(message, self.service.ball_spawn_config)
+                self.command_state.ball_spawn_requested = True
+
+    async def select_model(self, model_id: str) -> dict[str, Any]:
+        async with self._lock:
+            payload = await self._run_sync(self.service.select_model, model_id)
+            self.session = await self._run_sync(self.service.create_session)
+            self.command_state.reset_requested = False
+            self.command_state.reset_options = None
+            self.command_state.ball_spawn_requested = False
+            self.command_state.ball_spawn_options = None
+            ready = {"type": "ready", "config": self.service.config_payload(self.session.runtime)}
+            frame = await self._run_sync(self.session.frame, reset=True)
+            self.last_frame = frame
+
+        self._publish(ready)
+        self._publish(frame)
+        return payload
+
+    async def _run(self) -> None:
+        while True:
+            if not self.subscribers:
+                await asyncio.sleep(0.25)
+                continue
+
+            async with self._lock:
+                session = await self._ensure_session_locked()
+                state = self.command_state
+                if state.reset_requested:
+                    state.reset_requested = False
+                    reset_options = state.reset_options
+                    state.reset_options = None
+                    frame = await self._run_sync(session.reset, reset_options)
+                elif state.ball_spawn_requested:
+                    state.ball_spawn_requested = False
+                    spawn_options = state.ball_spawn_options or {}
+                    state.ball_spawn_options = None
+                    frame = await self._run_sync(session.spawn_ball, spawn_options)
+                elif state.playback == "playing":
+                    frame = await self._run_sync(session.step)
+                else:
+                    frame = await self._run_sync(session.frame)
+
+                self.last_frame = frame
+                delay = session.control_dt if state.playback == "playing" else 0.1
+
+            self._publish(frame)
+            await asyncio.sleep(delay)
+
+    async def _ensure_session_locked(self) -> "LiveSimulationSession":
+        if self.session is None or self.session.runtime is not self.service.active_runtime:
+            self.session = await self._run_sync(self.service.create_session)
+            self.last_frame = await self._run_sync(self.session.frame, reset=True)
+        return self.session
+
+    async def _run_sync(self, func: Any, *args: Any, **kwargs: Any) -> Any:
+        loop = asyncio.get_running_loop()
+        call = functools.partial(func, *args, **kwargs)
+        return await loop.run_in_executor(self._executor, call)
+
+    def _publish(self, message: dict[str, Any]) -> None:
+        for queue in list(self.subscribers):
+            offer_queue_message(queue, message)
+
+
+def offer_queue_message(queue: asyncio.Queue[dict[str, Any]], message: dict[str, Any]) -> None:
+    if queue.full():
+        try:
+            queue.get_nowait()
+        except asyncio.QueueEmpty:
+            pass
+    try:
+        queue.put_nowait(message)
+    except asyncio.QueueFull:
+        pass
 
 
 class LiveSimulationSession:

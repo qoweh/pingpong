@@ -48,7 +48,6 @@ export function App() {
   const [loadingProgress, setLoadingProgress] = useState<LoadingProgress>(INITIAL_LOADING_PROGRESS);
   const [resetSignal, setResetSignal] = useState(0);
   const [ballSpawnSignal, setBallSpawnSignal] = useState(0);
-  const [canvasKey, setCanvasKey] = useState(0);
   const [controlsOpen, setControlsOpen] = useState(true);
   const selectedModel = useMemo(
     () => models.find((model) => model.id === activeModelId) ?? models[0] ?? null,
@@ -107,8 +106,6 @@ export function App() {
           throw new Error("Model response was not readable.");
         }
         applyModelsPayload(parsed);
-        setSnapshot({ ...ZERO_SNAPSHOT, policyMessage: "Connecting to policy model" });
-        setCanvasKey((key) => key + 1);
         setPlayback("playing");
       } catch (error) {
         setModelError(error instanceof Error ? error.message : "Model switch failed.");
@@ -126,6 +123,20 @@ export function App() {
   const updateLoadingProgress = useCallback((progress: LoadingProgress) => {
     setLoadingProgress(progress);
   }, []);
+
+  const handleSnapshot = useCallback((nextSnapshot: SimulationSnapshot) => {
+    setSnapshot(nextSnapshot);
+    if (nextSnapshot.modelId) {
+      setActiveModelId((current) => (current === nextSnapshot.modelId ? current : nextSnapshot.modelId));
+    }
+  }, []);
+
+  useEffect(() => {
+    if (selectedModel?.ballSpawn) {
+      setBallSpawnConfig(selectedModel.ballSpawn);
+      setBallSpawn((current) => clampBallSpawnSettings(current, selectedModel.ballSpawn ?? DEFAULT_BALL_SPAWN_CONFIG, "trained"));
+    }
+  }, [selectedModel?.id, selectedModel?.ballSpawn]);
 
   useEffect(() => {
     if (isDocsPage) {
@@ -192,12 +203,11 @@ export function App() {
               <section className="viewer-pane" aria-label="Simulation viewer">
                 <Suspense fallback={<div className="simulation-canvas" />}>
                   <SimulationCanvas
-                    key={canvasKey}
                     playback={playback}
                     cameraMode={cameraMode}
                     visualization={visualization}
                     ballSpawn={ballSpawn}
-                    onSnapshot={setSnapshot}
+                    onSnapshot={handleSnapshot}
                     onStatus={updateStatus}
                     onProgress={updateLoadingProgress}
                     resetSignal={resetSignal}

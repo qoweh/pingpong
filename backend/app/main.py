@@ -11,8 +11,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 
-from .ball_spawn import BallSpawnConfig, parse_ball_spawn_options
-from .live_simulation import LiveCommandState, LiveSimulationService
+from .live_simulation import LiveSimulationHub, LiveSimulationService
 from .settings import load_settings
 
 
@@ -22,7 +21,11 @@ settings = load_settings()
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     app.state.simulation = LiveSimulationService(settings)
-    yield
+    app.state.live_hub = LiveSimulationHub(app.state.simulation)
+    try:
+        yield
+    finally:
+        await app.state.live_hub.stop()
 
 
 app = FastAPI(lifespan=lifespan, docs_url=None, redoc_url=None, openapi_url=None)
@@ -73,7 +76,7 @@ async def select_model(payload: dict[str, Any] = Body(...)) -> dict[str, Any]:
         raise HTTPException(status_code=400, detail="modelId is required.")
 
     try:
-        return await asyncio.to_thread(app.state.simulation.select_model, model_id)
+        return await app.state.live_hub.select_model(model_id)
     except KeyError as exc:
         raise HTTPException(status_code=404, detail=f"Unknown model: {model_id}") from exc
 
@@ -81,41 +84,30 @@ async def select_model(payload: dict[str, Any] = Body(...)) -> dict[str, Any]:
 @app.websocket("/api/live")
 async def live(websocket: WebSocket) -> None:
     await websocket.accept()
-    simulation = app.state.simulation
-    command_state = LiveCommandState()
-    session = await asyncio.to_thread(simulation.create_session)
-    receiver = asyncio.create_task(receive_commands(websocket, command_state, session.ball_spawn_config))
+    queue = await app.state.live_hub.subscribe()
+    sender = asyncio.create_task(send_live_messages(websocket, queue))
+    receiver = asyncio.create_task(receive_commands(websocket, app.state.live_hub))
 
     try:
-        await websocket.send_json({"type": "ready", "config": simulation.config_payload(session.runtime)})
-        await websocket.send_json(session.frame(reset=True))
-
-        while True:
-            if command_state.reset_requested:
-                command_state.reset_requested = False
-                reset_options = command_state.reset_options
-                command_state.reset_options = None
-                frame = await asyncio.to_thread(session.reset, reset_options)
-            elif command_state.ball_spawn_requested:
-                command_state.ball_spawn_requested = False
-                spawn_options = command_state.ball_spawn_options or {}
-                command_state.ball_spawn_options = None
-                frame = await asyncio.to_thread(session.spawn_ball, spawn_options)
-            elif command_state.playback == "playing":
-                frame = await asyncio.to_thread(session.step)
-            else:
-                frame = await asyncio.to_thread(session.frame)
-
-            await websocket.send_json(frame)
-            await asyncio.sleep(session.control_dt if command_state.playback == "playing" else 0.1)
-    except WebSocketDisconnect:
-        pass
+        done, pending = await asyncio.wait({sender, receiver}, return_when=asyncio.FIRST_COMPLETED)
+        for task in pending:
+            task.cancel()
+        await asyncio.gather(*pending, return_exceptions=True)
+        await asyncio.gather(*done, return_exceptions=True)
     finally:
-        receiver.cancel()
-        await asyncio.gather(receiver, return_exceptions=True)
+        await app.state.live_hub.unsubscribe(queue)
 
 
-async def receive_commands(websocket: WebSocket, state: LiveCommandState, ball_spawn_config: BallSpawnConfig) -> None:
+async def send_live_messages(websocket: WebSocket, queue: asyncio.Queue[dict[str, Any]]) -> None:
+    while True:
+        message = await queue.get()
+        try:
+            await websocket.send_json(message)
+        except (WebSocketDisconnect, RuntimeError, OSError):
+            return
+
+
+async def receive_commands(websocket: WebSocket, live_hub: LiveSimulationHub) -> None:
     try:
         while True:
             raw_message = await websocket.receive_text()
@@ -124,17 +116,9 @@ async def receive_commands(websocket: WebSocket, state: LiveCommandState, ball_s
             except json.JSONDecodeError:
                 continue
 
-            message_type = message.get("type")
-            if message_type == "reset":
-                state.reset_requested = True
-            elif message_type == "playback":
-                playback = message.get("playback")
-                if playback in {"playing", "paused"}:
-                    state.playback = playback
-            elif message_type == "spawnBall":
-                state.ball_spawn_options = parse_ball_spawn_options(message, ball_spawn_config)
-                state.ball_spawn_requested = True
-    except WebSocketDisconnect:
+            if isinstance(message, dict):
+                await live_hub.handle_message(message)
+    except (WebSocketDisconnect, RuntimeError, OSError):
         return
 
 

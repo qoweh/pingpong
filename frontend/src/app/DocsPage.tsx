@@ -4,6 +4,7 @@ import { MarkdownDocument } from "./MarkdownDocument";
 
 const DOCS = [
   { title: "개요", path: "/docs/overview.md", id: "overview" },
+  { title: "런타임 구조", path: "/docs/runtime-architecture.md", id: "runtime-architecture" },
   { title: "시뮬레이션 환경", path: "/docs/simulation-environment.md", id: "simulation-environment" },
   { title: "상태와 행동", path: "/docs/mdp-formulation.md", id: "mdp-formulation" },
   { title: "제어 모델과 학습", path: "/docs/policy-and-training.md", id: "policy-and-training" },
