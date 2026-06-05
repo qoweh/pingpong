@@ -127,18 +127,18 @@ export class MujocoModelScene {
     }
 
     if (geomType === module.mjtGeom.mjGEOM_SPHERE.value) {
-      return this.registerGeometry(new THREE.SphereGeometry(size[0], 32, 18));
+      return this.registerGeometry(new THREE.SphereGeometry(size[0], 24, 12));
     }
 
     if (geomType === module.mjtGeom.mjGEOM_CAPSULE.value) {
-      return this.registerGeometry(new THREE.CapsuleGeometry(size[0], size[1] * 2, 12, 24));
+      return this.registerGeometry(new THREE.CapsuleGeometry(size[0], size[1] * 2, 8, 16));
     }
 
     if (geomType === module.mjtGeom.mjGEOM_CYLINDER.value) {
       if (geomName === "racket_rim") {
-        return this.registerGeometry(new THREE.TorusGeometry(size[0], size[2] || 0.0045, 12, 96).rotateX(Math.PI / 2));
+        return this.registerGeometry(new THREE.TorusGeometry(size[0], size[2] || 0.0045, 8, 64).rotateX(Math.PI / 2));
       }
-      return this.registerGeometry(new THREE.CylinderGeometry(size[0], size[0], size[1] * 2, 96));
+      return this.registerGeometry(new THREE.CylinderGeometry(size[0], size[0], size[1] * 2, 48));
     }
 
     if (geomType === module.mjtGeom.mjGEOM_BOX.value) {
@@ -146,7 +146,7 @@ export class MujocoModelScene {
     }
 
     if (geomType === module.mjtGeom.mjGEOM_ELLIPSOID.value) {
-      return this.registerGeometry(new THREE.SphereGeometry(1, 32, 18));
+      return this.registerGeometry(new THREE.SphereGeometry(1, 24, 12));
     }
 
     if (geomType === module.mjtGeom.mjGEOM_MESH.value) {

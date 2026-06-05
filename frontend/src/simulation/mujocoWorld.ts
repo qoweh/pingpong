@@ -18,6 +18,8 @@ const MODEL_FS_ROOT = "/pingpong_model";
 const BALL_BODY_NAME = "ball";
 const BALL_JOINT_NAME = "ball_joint";
 const RACKET_SITE_NAME = "racket_center";
+const INITIAL_RECONNECT_DELAY_MS = 650;
+const MAX_RECONNECT_DELAY_MS = 5000;
 type SceneFormat = "xml" | "mjb";
 
 type MujocoIds = {
@@ -79,6 +81,10 @@ export class MujocoWorld {
   private data: MjData | null = null;
   private ids: MujocoIds | null = null;
   private socket: WebSocket | null = null;
+  private reconnectTimer: number | null = null;
+  private reconnectAttempts = 0;
+  private socketSerial = 0;
+  private disposed = false;
   private latestFrame: LiveFrame | null = null;
   private pendingSpawn: BallSpawnSettings | null = null;
   private liveReady = false;
@@ -102,6 +108,7 @@ export class MujocoWorld {
   private latestAction: number[] | null = null;
 
   async initialize(onProgress?: LoadingProgressListener): Promise<void> {
+    this.disposed = false;
     notifyProgress(onProgress, 6, "Loading MuJoCo physics engine");
     const [module, manifest] = await Promise.all([
       loadMujocoModule().then((loadedModule) => {
@@ -133,6 +140,9 @@ export class MujocoWorld {
   }
 
   dispose(): void {
+    this.disposed = true;
+    this.socketSerial += 1;
+    this.clearReconnectTimer();
     this.socket?.close();
     this.data?.delete();
     this.model?.delete();
@@ -224,17 +234,31 @@ export class MujocoWorld {
   }
 
   private connectLiveBackend(): void {
+    if (this.disposed) {
+      return;
+    }
+
+    const serial = this.socketSerial + 1;
+    this.socketSerial = serial;
+    this.clearReconnectTimer();
     this.socket?.close();
     this.socket = new WebSocket(liveWebSocketUrl());
 
     this.socket.addEventListener("open", () => {
+      if (serial !== this.socketSerial) {
+        return;
+      }
       this.liveConnected = true;
       this.policyMessage = "Connecting to policy model";
+      this.reconnectAttempts = 0;
       this.sendCommand({ type: "playback", playback: this.playback });
       this.flushPendingSpawn();
     });
 
     this.socket.addEventListener("message", (event) => {
+      if (serial !== this.socketSerial) {
+        return;
+      }
       const message = parseLiveMessage(event.data);
       if (!message) {
         return;
@@ -252,15 +276,44 @@ export class MujocoWorld {
     });
 
     this.socket.addEventListener("close", () => {
+      if (serial !== this.socketSerial || this.disposed) {
+        return;
+      }
       this.liveConnected = false;
       this.liveReady = false;
-      this.policyMessage = "Live policy stream disconnected. Refresh if it does not reconnect.";
+      this.policyMessage = "Live policy stream reconnecting...";
+      this.scheduleReconnect();
     });
 
     this.socket.addEventListener("error", () => {
+      if (serial !== this.socketSerial || this.disposed) {
+        return;
+      }
       this.liveConnected = false;
-      this.policyMessage = "Could not connect to the live policy stream.";
+      this.policyMessage = "Live policy stream reconnecting...";
+      this.scheduleReconnect();
     });
+  }
+
+  private scheduleReconnect(): void {
+    if (this.disposed || this.reconnectTimer !== null) {
+      return;
+    }
+
+    const delay = Math.min(MAX_RECONNECT_DELAY_MS, INITIAL_RECONNECT_DELAY_MS * 2 ** this.reconnectAttempts);
+    this.reconnectAttempts += 1;
+    this.reconnectTimer = window.setTimeout(() => {
+      this.reconnectTimer = null;
+      this.connectLiveBackend();
+    }, delay);
+  }
+
+  private clearReconnectTimer(): void {
+    if (this.reconnectTimer === null) {
+      return;
+    }
+    window.clearTimeout(this.reconnectTimer);
+    this.reconnectTimer = null;
   }
 
   private sendCommand(command: Record<string, unknown>): boolean {
@@ -368,7 +421,7 @@ export class MujocoWorld {
     onProgress?: LoadingProgressListener
   ): Promise<MjModel> {
     try {
-      return this.loadModel(module, `${MODEL_FS_ROOT}/${manifest.scene}`, manifest.sceneFormat);
+      return this.loadModel(module, manifest.scene, manifest.sceneFormat);
     } catch (primaryError) {
       const fallback = fallbackScene(manifest);
       if (!fallback) {
@@ -379,7 +432,7 @@ export class MujocoWorld {
       await this.loadSceneAssets(fallback.files, fallback.modelRoot, onProgress, 80, 5, "Loading source 3D scene");
       try {
         notifyProgress(onProgress, 85, "Opening source 3D scene");
-        return this.loadModel(module, `${MODEL_FS_ROOT}/${fallback.scene}`, fallback.sceneFormat);
+        return this.loadModel(module, fallback.scene, fallback.sceneFormat);
       } catch (fallbackError) {
         throw new Error(
           formatMujocoModelLoadError(primaryError, manifest.scene, manifest.sceneFormat, fallbackError, fallback.scene)
@@ -400,7 +453,7 @@ export class MujocoWorld {
       files,
       modelRoot,
       (file, bytes) => {
-        this.writeVirtualFile(`${MODEL_FS_ROOT}/${file}`, bytes);
+        this.registerModelFile(file, bytes);
       },
       ({ loaded, total }) => {
         const assetProgress = total > 0 ? loaded / total : 1;
@@ -418,14 +471,25 @@ export class MujocoWorld {
     return format === "mjb" ? module.MjModel.from_binary_path(scene, this.vfs) : module.MjModel.from_xml_path(scene, this.vfs);
   }
 
-  private writeVirtualFile(filePath: string, bytes: Uint8Array): void {
+  private registerModelFile(filePath: string, bytes: Uint8Array): void {
+    const normalizedPath = normalizeModelPath(filePath);
+    if (this.vfs) {
+      try {
+        this.vfs.deleteFile(normalizedPath);
+      } catch {
+        // Missing files are fine; this keeps repeated model loads deterministic.
+      }
+      this.vfs.addBuffer(normalizedPath, bytes);
+    }
+
     if (!this.module) {
       return;
     }
 
-    const directory = filePath.slice(0, filePath.lastIndexOf("/"));
+    const virtualPath = `${MODEL_FS_ROOT}/${normalizedPath}`;
+    const directory = virtualPath.slice(0, virtualPath.lastIndexOf("/"));
     this.ensureVirtualDirectory(directory);
-    this.module.FS.writeFile(filePath, bytes);
+    this.module.FS.writeFile(virtualPath, bytes);
   }
 
   private ensureVirtualDirectory(directory: string): void {
@@ -570,6 +634,10 @@ function parseLiveMessage(rawData: unknown): LiveMessage | null {
   } catch {
     return null;
   }
+}
+
+function normalizeModelPath(filePath: string): string {
+  return filePath.replace(/^\/+/, "").replace(/^pingpong_model\//, "");
 }
 
 function fallbackScene(manifest: MujocoAssetManifest): FallbackScene | null {

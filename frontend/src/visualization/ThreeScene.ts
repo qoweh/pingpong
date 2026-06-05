@@ -30,7 +30,11 @@ export class ThreeScene {
   private trailPointCount = 0;
   private lastContactTime: number | null = null;
   private lastTrailResetSerial = -1;
+  private lastTrailSampleTime = -1;
   private lastMarkerResetSerial = -1;
+  private lastModelUpdateTime = -1;
+  private lastModelUpdateResetSerial = -1;
+  private lastModelUpdateModelId: string | null = null;
 
   constructor(private readonly host: HTMLElement) {
     this.scene = new THREE.Scene();
@@ -40,7 +44,7 @@ export class ThreeScene {
     this.renderer = new THREE.WebGLRenderer({ antialias: true, alpha: false, powerPreference: "high-performance" });
     this.renderer.setPixelRatio(1);
     this.renderer.setClearColor(0x263f59, 1);
-    this.renderer.shadowMap.enabled = true;
+    this.renderer.shadowMap.enabled = false;
     this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
     this.renderer.outputColorSpace = THREE.SRGBColorSpace;
     this.host.appendChild(this.renderer.domElement);
@@ -71,7 +75,7 @@ export class ThreeScene {
     this.scene.add(new THREE.HemisphereLight(0xffffff, 0x1b3146, 2.25));
     const key = new THREE.DirectionalLight(0xffffff, 1.55);
     key.position.copy(mujocoToThree([0, -3, 3]));
-    key.castShadow = true;
+    key.castShadow = false;
     key.shadow.mapSize.set(1024, 1024);
     key.shadow.camera.near = 0.2;
     key.shadow.camera.far = 6;
@@ -163,10 +167,27 @@ export class ThreeScene {
     visualization: VisualizationSettings,
     config: DemoConfig
   ): void {
-    this.modelScene?.update();
+    if (this.shouldUpdateModelScene(snapshot)) {
+      this.modelScene?.update();
+    }
     this.updateTrail(snapshot, visualization.trail);
     this.updateTargetBand(snapshot, visualization.targetBand, config);
     this.updateContactMarkers(snapshot, visualization.contactMarker);
+  }
+
+  private shouldUpdateModelScene(snapshot: SimulationSnapshot): boolean {
+    if (
+      this.lastModelUpdateTime === snapshot.time &&
+      this.lastModelUpdateResetSerial === snapshot.resetSerial &&
+      this.lastModelUpdateModelId === snapshot.modelId
+    ) {
+      return false;
+    }
+
+    this.lastModelUpdateTime = snapshot.time;
+    this.lastModelUpdateResetSerial = snapshot.resetSerial;
+    this.lastModelUpdateModelId = snapshot.modelId;
+    return true;
   }
 
   render(mode: CameraMode): void {
@@ -249,6 +270,11 @@ export class ThreeScene {
       this.resetTrailGeometry(snapshot.resetSerial);
     }
 
+    if (this.lastTrailSampleTime === snapshot.time) {
+      return;
+    }
+    this.lastTrailSampleTime = snapshot.time;
+
     if (this.trailPointCount >= TRAIL_MAX_POINTS) {
       this.trailPositions.copyWithin(0, 3);
       this.trailPointCount = TRAIL_MAX_POINTS - 1;
@@ -266,6 +292,7 @@ export class ThreeScene {
   private resetTrailGeometry(resetSerial: number): void {
     this.trailPointCount = 0;
     this.lastTrailResetSerial = resetSerial;
+    this.lastTrailSampleTime = -1;
     this.updateTrailGeometry();
   }
 

@@ -35,6 +35,17 @@ app.add_middleware(
 )
 
 
+@app.middleware("http")
+async def cache_static_assets(request, call_next):
+    response = await call_next(request)
+    path = request.url.path
+    if path.endswith("/asset-manifest.json"):
+        response.headers["Cache-Control"] = "no-cache"
+    elif path.startswith(("/assets/", "/runtime-mujoco-assets/")):
+        response.headers["Cache-Control"] = "public, max-age=604800"
+    return response
+
+
 @app.get("/api/health")
 async def health() -> dict[str, Any]:
     return {

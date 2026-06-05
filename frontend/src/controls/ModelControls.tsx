@@ -1,3 +1,5 @@
+import { useMemo } from "react";
+
 import type { ModelMetadata } from "../simulation/types";
 
 interface ModelControlsProps {
@@ -10,7 +12,7 @@ interface ModelControlsProps {
 }
 
 export function ModelControls({ models, activeModelId, selectedModel, switching, error, onSelect }: ModelControlsProps) {
-  const groups = groupModels(models);
+  const groups = useMemo(() => groupModels(models), [models]);
 
   return (
     <div className="control-section model-section">
