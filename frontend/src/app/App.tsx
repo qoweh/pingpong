@@ -253,7 +253,7 @@ export function App() {
                   <span className={ready ? "status-dot ready" : "status-dot"} />
                   <span>{ready ? "Simulation Ready" : snapshot.mujocoLoaded ? snapshot.policyMessage : status}</span>
                 </div>
-                <div className="shared-session-note">Shared demo session: changes affect all viewers.</div>
+                <div className="shared-session-note">Shared server session: changes affect all viewers.</div>
                 {showLoadingOverlay ? (
                   <LoadingOverlay
                     status={status}
