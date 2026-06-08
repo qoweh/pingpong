@@ -47,6 +47,8 @@ class LiveCommandState:
 
 @dataclass
 class RuntimeModel:
+    # PPO policy와 그 policy를 실행하기 위한 환경 설정을 하나의 runtime 단위로 묶는다.
+    # LINK: backend/app/model_catalog.py:70
     record: ModelRecord
     env_kwargs: dict[str, Any]
     ball_spawn_config: dict[str, Any]
@@ -64,6 +66,8 @@ class RuntimeModel:
         return self.record.metadata
 
     def predict(self, observation: Any, deterministic: bool) -> np.ndarray:
+        # 서버 live loop는 매 step마다 observation을 policy 입력 형태로 맞춘 뒤 PPO action을 계산한다.
+        # LINK: backend/vendor/pingpong_rl2/src/pingpong_rl2/envs/keepup_env.py:1501
         policy_observation = self.policy_observation(observation)
         with self.policy_lock:
             action, _ = self.policy.predict(
@@ -73,6 +77,7 @@ class RuntimeModel:
         return np.asarray(action, dtype=float)
 
     def policy_observation(self, observation: Any) -> np.ndarray:
+        # 오래된 모델의 observation 차원이 다를 때는 현재 observation에서 호환 가능한 부분만 투영한다.
         raw_observation = np.asarray(observation, dtype=np.float32).reshape(-1)
         expected_dim = int(self.metadata.get("observationDim") or 0)
         if expected_dim and raw_observation.shape[0] != expected_dim:
@@ -84,6 +89,8 @@ class RuntimeModel:
 
 class LiveSimulationService:
     def __init__(self, settings: AppSettings) -> None:
+        # vendored RL 패키지를 로드한 뒤 모델 카탈로그와 최초 active runtime을 준비한다.
+        # LINK: backend/vendor/pingpong_rl2/src/pingpong_rl2/utils/ppo_runs.py:181
         self.settings = settings
         self._load_rl_package(settings.rl_source_root)
 
@@ -99,6 +106,8 @@ class LiveSimulationService:
         self.active_runtime = self._load_runtime_for_path(settings.model_path)
 
     def create_session(self) -> "LiveSimulationSession":
+        # active runtime을 기준으로 실제 MuJoCo/Gym session을 새로 만든다.
+        # LINK: backend/app/live_simulation.py:434
         with self._runtime_lock:
             runtime = self.active_runtime
         return LiveSimulationSession(self, runtime)
@@ -117,6 +126,7 @@ class LiveSimulationService:
             return self.active_runtime.ball_spawn_config
 
     def config_payload(self, runtime: RuntimeModel | None = None) -> dict[str, Any]:
+        # 프론트 초기 로딩과 ready 메시지에서 공유하는 현재 runtime 설정 payload를 만든다.
         active_runtime = runtime
         if active_runtime is None:
             with self._runtime_lock:
@@ -133,6 +143,8 @@ class LiveSimulationService:
         }
 
     def models_payload(self) -> dict[str, Any]:
+        # UI에는 dimension별 대표/최신 모델만 노출하되 현재 활성 모델은 항상 포함한다.
+        # LINK: backend/app/model_catalog.py:197
         with self._runtime_lock:
             active_runtime = self.active_runtime
             active_model_id = active_runtime.record.id
@@ -152,6 +164,8 @@ class LiveSimulationService:
         }
 
     def select_model(self, model_id: str) -> dict[str, Any]:
+        # 모델 zip을 runtime으로 로드하거나 캐시에서 꺼내 active runtime으로 교체한다.
+        # LINK: backend/app/model_catalog.py:130
         record = self.model_catalog.get(model_id)
         if record is None or not is_catalog_visible(record):
             raise KeyError(model_id)
@@ -174,6 +188,8 @@ class LiveSimulationService:
         }
 
     def _resolve_env_kwargs(self, model_path: Path) -> dict[str, Any]:
+        # 훈련 summary의 환경 힌트와 현재 배포 scene을 합쳐 live runtime용 env kwargs를 만든다.
+        # LINK: backend/vendor/pingpong_rl2/src/pingpong_rl2/utils/ppo_runs.py:181
         env_kwargs = dict(self.resolve_env_kwargs_for_model(model_path))
         summary = read_json(training_summary_path(model_path, infer_run_name(model_path)))
         env_kwargs = env_kwargs_with_summary_hints(env_kwargs, summary)
@@ -202,6 +218,7 @@ class LiveSimulationService:
             return runtime
 
     def _load_runtime(self, record: ModelRecord) -> RuntimeModel:
+        # SB3 PPO zip을 CPU로 로드하고, 실제 policy 객체에서 읽은 metadata로 카탈로그를 보강한다.
         env_kwargs = self._resolve_env_kwargs(record.path)
         ball_spawn_config = build_ball_spawn_config(env_kwargs, record.path)
         policy = PPO.load(str(record.path), device="cpu")
@@ -246,6 +263,8 @@ class LiveSimulationService:
 
 class LiveSimulationHub:
     def __init__(self, service: LiveSimulationService) -> None:
+        # 하나의 공유 session을 돌리고 여러 WebSocket 구독자에게 최신 frame을 fan-out한다.
+        # LINK: backend/app/main.py:97
         self.service = service
         self.command_state = LiveCommandState()
         self.session: LiveSimulationSession | None = None
@@ -267,6 +286,7 @@ class LiveSimulationHub:
         self._executor.shutdown(wait=False, cancel_futures=True)
 
     async def subscribe(self) -> asyncio.Queue[dict[str, Any]]:
+        # 새 클라이언트가 붙으면 ready 메시지와 마지막 frame을 즉시 보내 초기 화면을 채운다.
         await self.start()
         queue: asyncio.Queue[dict[str, Any]] = asyncio.Queue(maxsize=3)
         async with self._lock:
@@ -281,6 +301,8 @@ class LiveSimulationHub:
         self.subscribers.discard(queue)
 
     async def handle_message(self, message: dict[str, Any]) -> None:
+        # WebSocket 명령은 즉시 시뮬레이션을 건드리지 않고 다음 loop tick에서 적용될 상태로 저장한다.
+        # LINK: backend/app/ball_spawn.py:104
         message_type = message.get("type")
         async with self._lock:
             if message_type == "reset":
@@ -294,6 +316,7 @@ class LiveSimulationHub:
                 self.command_state.ball_spawn_requested = True
 
     async def select_model(self, model_id: str) -> dict[str, Any]:
+        # 모델 교체는 session 재생성과 frame 발행까지 한 lock 안에서 처리해 중간 상태 노출을 막는다.
         async with self._lock:
             previous_runtime = await self._run_sync(self.service.current_runtime)
             previous_session = self.session
@@ -320,6 +343,8 @@ class LiveSimulationHub:
         return payload
 
     async def _run(self) -> None:
+        # shared live loop: 명령 적용, PPO action 계산, env step, frame publish를 반복한다.
+        # LINK: backend/app/live_simulation.py:509
         while True:
             try:
                 if not self.subscribers:
@@ -363,12 +388,14 @@ class LiveSimulationHub:
                 await asyncio.sleep(0.5)
 
     async def _ensure_session_locked(self) -> "LiveSimulationSession":
+        # active runtime이 바뀌었거나 아직 session이 없으면 새 Gym/MuJoCo session을 만든다.
         if self.session is None or self.session.runtime is not self.service.active_runtime:
             self.session = await self._run_sync(self.service.create_session)
             self.last_frame = await self._run_sync(self.session.frame, reset=True)
         return self.session
 
     async def _run_sync(self, func: Any, *args: Any, **kwargs: Any) -> Any:
+        # MuJoCo/PPO의 blocking 계산을 전용 스레드에서 실행해 FastAPI event loop를 막지 않는다.
         loop = asyncio.get_running_loop()
         call = functools.partial(func, *args, **kwargs)
         return await loop.run_in_executor(self._executor, call)
@@ -379,6 +406,7 @@ class LiveSimulationHub:
 
 
 def offer_queue_message(queue: asyncio.Queue[dict[str, Any]], message: dict[str, Any]) -> None:
+    # 느린 클라이언트가 오래된 frame을 쌓지 않도록 queue가 꽉 차면 가장 오래된 메시지를 버린다.
     if queue.full():
         try:
             queue.get_nowait()
@@ -405,6 +433,8 @@ def model_selection_message(model_id: str, error: Exception) -> str:
 
 class LiveSimulationSession:
     def __init__(self, service: LiveSimulationService, runtime: RuntimeModel) -> None:
+        # 하나의 runtime으로 실제 Gym 환경을 열고 policy/action shape 호환성을 검증한다.
+        # LINK: backend/vendor/pingpong_rl2/src/pingpong_rl2/envs/gym_env.py:15
         self.service = service
         self.runtime = runtime
         self.env = service.env_class(**runtime.env_kwargs)
@@ -433,6 +463,7 @@ class LiveSimulationSession:
         return float(self.sim.control_dt)
 
     def reset(self, options: dict[str, Any] | None = None) -> dict[str, Any]:
+        # episode를 새로 시작하고 reset option이 있으면 다음 reset에도 이어 쓰도록 저장한다.
         if options is not None:
             self.custom_reset_options = dict(options)
 
@@ -449,6 +480,8 @@ class LiveSimulationSession:
         return self.frame(reset=True)
 
     def spawn_ball(self, options: dict[str, Any]) -> dict[str, Any]:
+        # 공 스폰 UI 명령은 환경 전체 reset 대신 현재 racket 기준 공 위치/속도만 재배치한다.
+        # LINK: backend/app/ball_spawn.py:104
         self.custom_reset_options = dict(options)
         base_env = self.env.base_env
         z_offset = float(options.get("ball_height", base_env.ball_height))
@@ -474,6 +507,8 @@ class LiveSimulationSession:
         return self.frame(reset=True)
 
     def step(self) -> dict[str, Any]:
+        # observation -> PPO action -> Gym step -> frame 생성이 live inference의 한 tick이다.
+        # LINK: backend/vendor/pingpong_rl2/src/pingpong_rl2/envs/keepup_env.py:1625
         if self.reset_pending:
             return self.reset()
 
@@ -493,6 +528,7 @@ class LiveSimulationSession:
         return frame
 
     def _validate_policy_shapes(self) -> None:
+        # 모델 metadata와 현재 env의 observation/action 차원이 맞지 않으면 모델 전환을 실패시킨다.
         self._validate_observation_shape()
         expected_action_dim = int(self.runtime.metadata.get("actionDim") or 0)
         actual_action_dim = action_space_dim(getattr(self.env, "action_space", None))
@@ -512,6 +548,7 @@ class LiveSimulationSession:
             )
 
     def _clear_episode_counters(self) -> None:
+        # 수동 공 스폰 뒤에도 reward/contact 통계가 새 episode처럼 보이도록 내부 카운터를 초기화한다.
         base_env = self.env.base_env
         base_env.step_count = 0
         base_env.contact_count = 0
@@ -567,6 +604,7 @@ class LiveSimulationSession:
         reset: bool = False,
         include_events: bool = False,
     ) -> dict[str, Any]:
+        # 브라우저가 3D scene에 그대로 복사할 MuJoCo state와 UI 지표를 하나의 frame으로 직렬화한다.
         info = self.last_info
         contact_position = vector_from_info(info, "contact_mujoco_position")
         contact_event = bool(include_events and info.get("contact_event_during_step", False))
@@ -641,6 +679,7 @@ def action_space_dim(action_space: Any) -> int | None:
 
 
 def legacy_policy_observation(observation: np.ndarray, expected_dim: int) -> np.ndarray | None:
+    # 예전 정책 zip이 기대하는 26D/29D observation만 현재 observation에서 호환 추출한다.
     if observation.shape[0] < 35:
         return None
     if expected_dim == 29:

@@ -24,6 +24,8 @@ from pingpong_rl2.defaults import (
 )
 from pingpong_rl2.envs.pingpong_sim import PingPongSim
 
+# action mode 이름은 policy action vector가 어떤 의미의 제어값을 담는지 결정한다.
+# LINK: backend/app/model_catalog.py:494
 _ACTION_MODES = (
     "position",
     "position_strike",
@@ -92,6 +94,8 @@ _EASY_NEXT_BALL_SOFT_SPEED_LIMIT = 3.0
 _MIN_DESIRED_APEX_HEIGHT_DELTA = 0.01
 _TRAJECTORY_MATCH_ERROR_SCALE = 1.0
 
+# observation component 목록은 policy 입력 벡터의 순서와 길이를 정의한다.
+# LINK: backend/app/live_simulation.py:79
 _POSITION_OBSERVATION_COMPONENTS: tuple[tuple[str, int], ...] = (
     ("joint_positions", 7),
     ("joint_velocities", 7),
@@ -144,6 +148,7 @@ def _build_observation_layout(
     include_next_intercept_observation: bool,
     include_desired_outgoing_velocity_observation: bool,
 ) -> tuple[tuple[tuple[str, int], ...], dict[str, slice], int]:
+    # action mode와 feature flag를 조합해 observation 벡터의 slice map과 총 차원을 계산한다.
     components = _POSITION_OBSERVATION_COMPONENTS
     if include_task_phase_observation:
         components = components + _TASK_PHASE_OBSERVATION_COMPONENTS
@@ -345,6 +350,8 @@ class PingPongKeepUpEnv:
         contact_frame_low_apex_recovery_velocity_gain: float = 0.0,
         contact_frame_low_apex_recovery_velocity_max: float = 0.0,
     ) -> None:
+        # 학습/서빙에서 쓰는 keep-up MDP의 물리, action, reward, reset 파라미터를 모두 고정한다.
+        # LINK: backend/vendor/pingpong_rl2/src/pingpong_rl2/envs/gym_env.py:15
         if sim is not None and scene_path is not None:
             raise ValueError("scene_path can only be provided when sim is None.")
         self.sim = PingPongSim(scene_path=scene_path) if sim is None else sim
@@ -1364,6 +1371,8 @@ class PingPongKeepUpEnv:
                     "initial_target_tilt cannot be combined with strike_tilt_ramp_pitch because "
                     "the ramped strike experiment assumes neutral tilt outside the strike window."
                 )
+        # 모든 파라미터 검증이 끝나면 racket 목표 pose를 관절 target으로 바꿀 controller를 만든다.
+        # LINK: backend/vendor/pingpong_rl2/src/pingpong_rl2/controllers/ee_pose_controller.py:11
         self.controller = RacketCartesianController(
             self.sim,
             position_gain=self.controller_position_gain,
@@ -1385,6 +1394,8 @@ class PingPongKeepUpEnv:
             body_clearance_max_step=self.controller_body_clearance_max_step,
             body_clearance_body_names=self.controller_body_clearance_body_names,
         )
+        # action mode별로 policy action vector의 차원과 각 축의 허용 범위를 구성한다.
+        # LINK: backend/app/model_catalog.py:462
         position_action_limit = np.array(
             [self.lateral_action_limit, self.lateral_action_limit, self.vertical_action_limit],
             dtype=float,
@@ -1447,6 +1458,7 @@ class PingPongKeepUpEnv:
             self.action_high = position_action_limit
         self.action_low = -self.action_high.copy()
         self.action_size = int(self.action_high.shape[0])
+        # observation layout은 action mode와 include_* 옵션에 따라 policy input 차원을 맞춘다.
         self._observation_components, self._observation_slices, self.observation_size = _build_observation_layout(
             self.action_mode,
             self.include_velocity_domain_observation,
@@ -1455,6 +1467,7 @@ class PingPongKeepUpEnv:
             self.include_next_intercept_observation,
             self.include_desired_outgoing_velocity_observation,
         )
+        # episode 진행 중 누적되는 contact, stability, residual action 상태를 초기값으로 둔다.
         self._rng = np.random.default_rng()
         self._spawn_ball_height_above_racket = self.ball_height
         self.step_count = 0
@@ -1486,6 +1499,8 @@ class PingPongKeepUpEnv:
         return seed
 
     def observation(self) -> np.ndarray:
+        # 로봇/라켓/공 상태와 예측 intercept 정보를 하나의 policy 입력 벡터로 이어 붙인다.
+        # LINK: backend/app/live_simulation.py:79
         ball_relative_position = self.sim.ball_position - self.sim.racket_position
         predicted_intercept_time = self._predicted_intercept_time()
         predicted_intercept_relative_xy = (
@@ -1548,6 +1563,8 @@ class PingPongKeepUpEnv:
         ball_angular_velocity: Sequence[float] | None = None,
         ball_xy_offset: Sequence[float] | None = None,
     ) -> tuple[np.ndarray, dict[str, object]]:
+        # reset distribution에서 공 초기 상태를 샘플링하고 episode 통계를 모두 초기화한다.
+        # LINK: backend/vendor/pingpong_rl2/src/pingpong_rl2/envs/pingpong_sim.py:113
         spawn_height = self._sample_reset_ball_height() if ball_height is None else float(ball_height)
         spawn_velocity = self._sample_reset_velocity() if ball_velocity is None else np.asarray(ball_velocity, dtype=float)
         spawn_angular_velocity = (
@@ -1606,10 +1623,13 @@ class PingPongKeepUpEnv:
         return self.observation(), info
 
     def step(self, action: Sequence[float]) -> tuple[np.ndarray, float, bool, bool, dict[str, object]]:
+        # policy action 하나를 받아 target pose 계산, MuJoCo step, reward/termination 판정까지 수행한다.
+        # LINK: backend/app/live_simulation.py:509
         action_array = np.asarray(action, dtype=float)
         if action_array.shape != (self.action_size,):
             raise ValueError(f"EE delta action must have shape ({self.action_size},), got {action_array.shape}.")
         applied_action = np.clip(action_array, self.action_low, self.action_high)
+        # 긴 contact-frame action은 위치/tilt 뒤에 붙은 residual control들을 mode별 slice로 나눠 저장한다.
         followup_lift_residual = 0.0
         if self.action_mode == "position_strike_tilt_lift":
             followup_lift_residual = float(applied_action[5])
@@ -1632,6 +1652,8 @@ class PingPongKeepUpEnv:
             self._contact_frame_strike_plane_z_residual_action = float(applied_action[14])
         if self.action_mode in _CONTACT_FRAME_TRACKING_RESIDUAL_ACTION_MODES:
             self._contact_frame_tracking_xy_residual_action = applied_action[15:17].copy()
+        # action mode에 따라 policy action을 world-frame target position으로 해석한다.
+        # LINK: backend/vendor/pingpong_rl2/src/pingpong_rl2/envs/keepup_env.py:4365
         if self._contact_frame_action_mode():
             self._update_contact_frame_plan()
             requested_target_position = self._contact_frame_action_target_position(applied_action[:3])
@@ -1643,6 +1665,7 @@ class PingPongKeepUpEnv:
         else:
             self.controller.add_target_offset(applied_action[:3])
             requested_target_position = self.controller.target_position
+        # tilt와 target velocity를 함께 설정해 controller가 다음 joint target을 계산할 준비를 한다.
         if self.action_mode == "position_tilt":
             next_target_tilt = self._constrained_target_tilt(self.controller.target_tilt + applied_action[3:])
             self.controller.set_target_tilt(next_target_tilt)
@@ -1674,11 +1697,14 @@ class PingPongKeepUpEnv:
             self.sim.ball_position,
             active=self._controller_body_clearance_active(),
         )
+        # joint target으로 MuJoCo를 한 control tick 진행하고 substep contact trace를 얻는다.
+        # LINK: backend/vendor/pingpong_rl2/src/pingpong_rl2/envs/pingpong_sim.py:360
         joint_targets = self.controller.compute_joint_targets()
         contact_trace = self.sim.step_with_contact_trace(joint_targets=joint_targets, n_substeps=self.sim.n_substeps)
         oracle_info = self._apply_contact_oracle(contact_trace)
         self.step_count += 1
 
+        # 접촉 이벤트, 성공 조건, 실패 조건, stable cycle 상태를 reward 계산 전에 먼저 정리한다.
         failure_reason = self._failure_reason()
         robot_body_contact_name = self.sim.ball_robot_body_contact()
         contact_active = bool(contact_trace["contact_observed"] or self.sim.has_contact("ball_geom", "racket_head"))
@@ -1724,6 +1750,8 @@ class PingPongKeepUpEnv:
         )
         phase_name = self._phase_name()
 
+        # 여러 reward term을 더해 최종 scalar reward를 만들고 episode 종료 여부를 결정한다.
+        # LINK: backend/vendor/pingpong_rl2/src/pingpong_rl2/envs/keepup_env.py:3453
         reward_terms = self._reward_terms(
             failure_reason,
             success_reason,
@@ -1745,6 +1773,7 @@ class PingPongKeepUpEnv:
         episode_success_reason = None
         if truncated and self.successful_bounce_count > 0:
             episode_success_reason = "keepup_time_limit"
+        # info dict는 학습 로그, 모델 metadata, live frame contact 표시가 함께 사용하는 진단 payload다.
         info: dict[str, object] = {
             "failure_reason": failure_reason,
             "robot_body_contact_name": robot_body_contact_name,
@@ -1959,6 +1988,8 @@ class PingPongKeepUpEnv:
         return self.observation(), reward, terminated, truncated, info
 
     def training_config(self) -> dict[str, object]:
+        # 현재 env 파라미터를 training summary에 저장 가능한 dict로 풀어 모델 재현성을 남긴다.
+        # LINK: backend/app/model_catalog.py:549
         return {
             "scene_path": self.scene_path,
             "action_mode": self.action_mode,
@@ -2164,6 +2195,7 @@ class PingPongKeepUpEnv:
         reset_velocity_z_range: Sequence[float] | None = None,
         reset_ball_angular_velocity_range: float | None = None,
     ) -> dict[str, object]:
+        # curriculum이나 실험 코드가 episode reset 분포만 런타임 중 바꿀 때 사용하는 좁은 update API다.
         if reset_xy_range is not None:
             parsed_xy_range = float(reset_xy_range)
             if parsed_xy_range < 0.0:
@@ -2277,6 +2309,7 @@ class PingPongKeepUpEnv:
         return float(max(0.0, 1.0 + self._contact_frame_tilt_scale_residual_action[1]))
 
     def _reset_contact_frame_plan(self) -> None:
+        # contact-frame planner가 들고 있던 다음 접촉 계획을 모두 비활성 상태로 되돌린다.
         self._contact_frame_plan_active = False
         self._contact_frame_strike_hold_active = False
         self._contact_frame_plan_intercept_time = 0.0
@@ -2309,6 +2342,8 @@ class PingPongKeepUpEnv:
         return float(intercept_time), contact_position
 
     def _update_contact_frame_plan(self) -> None:
+        # 하강 중인 공의 접촉 시점/위치를 예측해 desired outgoing velocity 계획을 갱신한다.
+        # LINK: backend/vendor/pingpong_rl2/src/pingpong_rl2/envs/keepup_env.py:2949
         if not self.contact_frame_planner_enabled or not self._contact_frame_action_mode():
             self._reset_contact_frame_plan()
             return
@@ -2481,6 +2516,7 @@ class PingPongKeepUpEnv:
         return None, None
 
     def _apply_contact_oracle(self, contact_trace: dict[str, object]) -> dict[str, object]:
+        # 실험용 oracle 모드는 실제 접촉 후 속도를 desired outgoing velocity 쪽으로 섞어 보정한다.
         oracle_info = {
             "oracle_contact_applied": False,
             "oracle_contact_mode": self.contact_oracle_mode,
@@ -2666,6 +2702,7 @@ class PingPongKeepUpEnv:
         return float(max(self.step_count - self._last_contact_step, 0) * self.sim.control_dt)
 
     def _phase_name(self) -> str:
+        # 현재 공 속도와 최근 접촉 여부로 prepare/strike/return/recovery phase를 나눈다.
         time_since_contact = self._time_since_contact()
         recent_contact = time_since_contact is not None and time_since_contact <= self.next_intercept_max_time
         ball_velocity_z = float(self.sim.ball_velocity[2])
@@ -2692,6 +2729,7 @@ class PingPongKeepUpEnv:
         return phase_vector
 
     def _next_intercept_metrics(self) -> dict[str, object]:
+        # 다음에 공이 racket 높이로 내려오는 위치와 그 위치가 다시 받을 만한지 계산한다.
         anchor_position = self._controller_anchor_position()
         target_xy = self._keepup_target_xy()
         target_z = float(anchor_position[2] + self._tracking_strike_plane_offset())
@@ -2853,6 +2891,8 @@ class PingPongKeepUpEnv:
         return (-0.05, max(2.0, float(dynamic_upper_bound)))
 
     def _failure_reason(self) -> str | None:
+        # 환경 단위 실패 판정은 MuJoCo wrapper에 위임하되 z bounds는 목표 높이에 맞게 동적으로 잡는다.
+        # LINK: backend/vendor/pingpong_rl2/src/pingpong_rl2/envs/pingpong_sim.py:320
         return self.sim.failure_reason(
             z_bounds=self._failure_z_bounds(),
             x_bounds=(0.0, 1.35),
@@ -2913,6 +2953,7 @@ class PingPongKeepUpEnv:
         target_xy: Sequence[float] | None = None,
         target_apex_z: float | None = None,
     ) -> tuple[np.ndarray, float, np.ndarray]:
+        # 접촉 후 공이 목표 apex와 다음 intercept 지점으로 가도록 필요한 outgoing velocity를 역산한다.
         contact_ball_position = (
             np.asarray(self.sim.ball_position, dtype=float)
             if ball_position is None
@@ -2942,6 +2983,7 @@ class PingPongKeepUpEnv:
         return desired_velocity, float(desired_time_to_apex), desired_target_xy
 
     def _contact_outgoing_trajectory_metrics(self, contact_trace: dict[str, object] | None) -> dict[str, object]:
+        # 실제 접촉 후 속도와 desired velocity를 비교해 reward/info에 쓸 trajectory error를 만든다.
         default_metrics: dict[str, object] = {
             "desired_outgoing_velocity_x": None,
             "desired_outgoing_velocity_y": None,
@@ -3373,6 +3415,7 @@ class PingPongKeepUpEnv:
         contact_trace: dict[str, object],
         contact_event: bool,
     ) -> str | None:
+        # 유효한 keep-up 성공은 upward velocity, racket 중심 정렬, apex window 조건을 모두 통과해야 한다.
         if failure_reason is not None or not contact_event:
             return None
         outgoing_velocity, _ = self._resolved_outgoing_ball_velocity(contact_trace)
@@ -3420,6 +3463,7 @@ class PingPongKeepUpEnv:
         stable_cycle_observed: bool = False,
         consecutive_stable_cycle_count: int | None = None,
     ) -> dict[str, float]:
+        # dense tracking 보상과 contact 품질 보상, 실패 penalty를 term별로 계산해 로그 가능한 형태로 둔다.
         if outgoing_trajectory_metrics is None:
             outgoing_trajectory_metrics = self._contact_outgoing_trajectory_metrics(contact_trace)
         tracking_scale = self.tracking_during_contact_scale if contact_active else 1.0
@@ -3621,6 +3665,7 @@ class PingPongKeepUpEnv:
         return reward_terms
 
     def _sample_reset_xy_offset(self) -> np.ndarray:
+        # reset 분포는 square/disk sampling 설정에 맞춰 공의 초기 xy offset을 샘플링한다.
         if self.reset_xy_range <= 0.0:
             return np.zeros(2, dtype=float)
         if self.reset_xy_sampling == "disk":
@@ -3873,6 +3918,7 @@ class PingPongKeepUpEnv:
         *,
         followup_lift_residual: float = 0.0,
     ) -> np.ndarray:
+        # strike 계열 action은 예측 접촉 xy와 lift feedforward를 기준으로 world target position을 만든다.
         action_array = np.asarray(action, dtype=float)
         if action_array.shape != (3,):
             raise ValueError(f"Strike action must have shape (3,), got {action_array.shape}.")
@@ -3890,6 +3936,7 @@ class PingPongKeepUpEnv:
         return target_position
 
     def _contact_frame_basis_xy(self) -> tuple[np.ndarray, np.ndarray, str]:
+        # contact-frame action의 x/y residual을 공-목표 방향(radial)과 접선(tangent) 축으로 정의한다.
         predicted_intercept_xy = (
             self._contact_frame_plan_contact_position[:2]
             if self._contact_frame_plan_active
@@ -4100,6 +4147,7 @@ class PingPongKeepUpEnv:
         *,
         lateral_brake_velocity: Sequence[float] | None = None,
     ) -> np.ndarray:
+        # contact-frame controller가 접촉 순간 필요한 racket 속도와 tracking residual을 합성한다.
         if not self._contact_frame_action_mode():
             return np.zeros(3, dtype=float)
         intercept_velocity = self._contact_frame_intercept_velocity_target(target_position)
@@ -4302,6 +4350,7 @@ class PingPongKeepUpEnv:
         return np.clip(target_tilt, -self.contact_frame_trajectory_tilt_limit, self.contact_frame_trajectory_tilt_limit)
 
     def _contact_frame_base_strike_tilt(self) -> np.ndarray:
+        # trajectory tilt, centering tilt, base residual을 합쳐 접촉 직전 기본 라켓 기울기를 만든다.
         if not self._contact_frame_action_mode():
             return np.zeros(2, dtype=float)
         if not self._contact_frame_strike_tilt_active():
@@ -4314,6 +4363,7 @@ class PingPongKeepUpEnv:
         return target_tilt
 
     def _contact_frame_action_target_position(self, action: Sequence[float]) -> np.ndarray:
+        # contact-frame action은 radial/tangent/strike-z residual로 계획된 접촉 target을 보정한다.
         action_array = np.asarray(action, dtype=float)
         if action_array.shape != (3,):
             raise ValueError(f"Contact-frame action must have shape (3,), got {action_array.shape}.")
@@ -4387,6 +4437,7 @@ class PingPongKeepUpEnv:
         return safe_target
 
     def _guarded_target_position(self, target_position: Sequence[float]) -> np.ndarray:
+        # 최종 목표 위치는 body keepout, pre-contact xy bound, lift 제한을 거쳐 안전한 범위로 들어온다.
         safe_target = self._body_safe_target_position(target_position)
         anchor_position = self._controller_anchor_position()
         pre_contact_xy_low, pre_contact_xy_high = self._pre_contact_xy_bounds()

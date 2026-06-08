@@ -1,3 +1,5 @@
+# 경로 상수와 PPO run/model resolver를 utils 패키지 공개 API로 모은다.
+# LINK: backend/vendor/pingpong_rl2/src/pingpong_rl2/utils/ppo_runs.py:1
 from pingpong_rl2.utils.paths import (
     ARTIFACT_ROOT,
     ASSET_ROOT,

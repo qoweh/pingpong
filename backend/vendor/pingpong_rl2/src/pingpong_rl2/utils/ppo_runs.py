@@ -39,6 +39,8 @@ from pingpong_rl2.utils.paths import PPO_RUNS_ROOT, resolve_input_path
 
 
 def default_run_name_for_action_mode(action_mode: str, smoke: bool = False) -> str:
+    # action_mode와 smoke 여부를 표준 run 이름으로 변환해 학습/평가 경로 규칙을 통일한다.
+    # LINK: backend/vendor/pingpong_rl2/src/pingpong_rl2/defaults.py:66
     smoke_run_names = {
         "position": SMOKE_PPO_RUN_NAME,
         "position_strike": SMOKE_PPO_POSITION_STRIKE_RUN_NAME,
@@ -141,6 +143,7 @@ def resolve_saved_model_path(
     *,
     prefer_best_model: bool = False,
 ) -> Path:
+    # 명시 경로, run 이름, 기본 후보 순서로 실제 사용할 PPO zip 경로를 결정한다.
     if model_path is not None:
         return resolve_input_path(model_path)
     if run_name is not None:
@@ -163,6 +166,8 @@ def load_training_summary(summary_path: Path) -> dict[str, object] | None:
 
 
 def load_env_config_for_model(model_path: Path) -> dict[str, object] | None:
+    # 모델 옆 training summary에서 훈련 당시 env_config를 찾아 runtime 재현에 사용한다.
+    # LINK: backend/app/live_simulation.py:190
     for summary_path in training_summary_candidates_for_model(model_path):
         summary = load_training_summary(summary_path)
         if summary is None:
@@ -189,6 +194,8 @@ def resolve_env_kwargs_for_model(
     reset_ball_angular_velocity_range: float | None = None,
     success_velocity_threshold: float | None = None,
 ) -> dict[str, object]:
+    # 기본 env kwargs에 training summary와 호출자가 준 override를 차례로 합쳐 최종 환경 설정을 만든다.
+    # LINK: backend/vendor/pingpong_rl2/src/pingpong_rl2/envs/keepup_env.py:176
     env_kwargs: dict[str, object] = {
         "action_mode": "position",
         "ball_height": DEFAULT_BALL_HEIGHT,

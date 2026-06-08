@@ -45,6 +45,8 @@ V39_TESTED_RANGES = {
 
 
 def build_ball_spawn_config(env_kwargs: dict[str, Any], model_path: Path) -> BallSpawnConfig:
+    # 훈련 env kwargs에서 공 초기 위치/속도 범위를 읽어 프론트 슬라이더 설정으로 변환한다.
+    # LINK: backend/app/model_catalog.py:130
     default_z = finite_float(env_kwargs.get("ball_height"), DEFAULT_BALL_SPAWN["zOffset"])
     xy_range = abs(finite_float(env_kwargs.get("reset_xy_range"), 0.0))
     xy_sampling = str(env_kwargs.get("reset_xy_sampling") or "square")
@@ -64,6 +66,7 @@ def build_ball_spawn_config(env_kwargs: dict[str, Any], model_path: Path) -> Bal
     tested_xy_radius = xy_range
 
     if is_keep_v39_model(model_path):
+        # keep_v39 계열은 데모에서 훈련 범위보다 넓은 tested range까지 조작할 수 있게 확장한다.
         merged_ranges = {
             key: (
                 min(trained_ranges[key][0], V39_TESTED_RANGES[key][0]),
@@ -99,6 +102,8 @@ def build_ball_spawn_config(env_kwargs: dict[str, Any], model_path: Path) -> Bal
 
 
 def parse_ball_spawn_options(message: dict[str, Any], config: BallSpawnConfig) -> dict[str, Any]:
+    # WebSocket spawnBall 메시지를 env.reset/reset_ball_above_racket이 이해하는 option 이름으로 바꾼다.
+    # LINK: backend/app/live_simulation.py:482
     ranges = config.get("ranges", FALLBACK_BALL_SPAWN_CONFIG["ranges"])
     defaults = config.get("defaults", FALLBACK_BALL_SPAWN_CONFIG["defaults"])
 
@@ -122,6 +127,7 @@ def clamp_axis(
     defaults: dict[str, float],
     key: str,
 ) -> float:
+    # 클라이언트 값은 신뢰하지 않고 서버가 가진 range와 default로 한 번 더 보정한다.
     axis_range = ranges.get(key, FALLBACK_BALL_SPAWN_CONFIG["ranges"][key])
     return clamp_float(
         message.get(key),
@@ -132,6 +138,7 @@ def clamp_axis(
 
 
 def clamp_xy_radius(x_offset: float, y_offset: float, config: BallSpawnConfig) -> tuple[float, float]:
+    # disk sampling 모델은 x/y를 사각형 clamp 뒤 다시 원 반경 안으로 투영한다.
     xy_constraint = config.get("xyConstraint")
     if not isinstance(xy_constraint, dict) or xy_constraint.get("sampling") != "disk":
         return x_offset, y_offset

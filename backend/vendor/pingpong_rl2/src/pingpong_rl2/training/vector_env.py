@@ -12,6 +12,8 @@ VectorMode = Literal["async", "sync"]
 
 
 def make_env_factory(env_kwargs: dict[str, object] | None = None):
+    # vector env가 worker마다 새 Gym 환경을 만들 수 있도록 closure factory를 반환한다.
+    # LINK: backend/vendor/pingpong_rl2/src/pingpong_rl2/envs/gym_env.py:15
     environment_kwargs = {} if env_kwargs is None else dict(env_kwargs)
 
     def _thunk() -> PingPongKeepUpGymEnv:
@@ -26,6 +28,7 @@ def make_gym_vector_env(
     vector_mode: VectorMode = "async",
     context: str = "spawn",
 ):
+    # PPO 학습 속도를 위해 같은 설정의 환경을 sync 또는 async vector env로 묶는다.
     if num_envs < 1:
         raise ValueError(f"num_envs must be positive, got {num_envs}.")
     env_fns = [make_env_factory(env_kwargs=env_kwargs) for _ in range(num_envs)]
@@ -44,6 +47,7 @@ def make_gym_vector_env(
 
 class SB3AsyncVectorEnvAdapter(VecEnv):
     def __init__(self, vector_env: AsyncVectorEnv | SyncVectorEnv):
+        # Gymnasium vector env의 반환 형식을 Stable-Baselines3 VecEnv 인터페이스에 맞춘다.
         if vector_env.metadata.get("autoreset_mode") != AutoresetMode.DISABLED:
             raise ValueError("SB3AsyncVectorEnvAdapter requires AsyncVectorEnv with autoreset disabled.")
         self.vector_env = vector_env
@@ -85,6 +89,7 @@ class SB3AsyncVectorEnvAdapter(VecEnv):
         return info_list
 
     def reset(self) -> VecEnvObs:
+        # SB3가 저장한 seed/options를 Gymnasium vector env reset 호출로 넘긴 뒤 내부 상태를 비운다.
         options = None
         if any(bool(option) for option in self._options):
             first_option = self._options[0]
@@ -105,6 +110,7 @@ class SB3AsyncVectorEnvAdapter(VecEnv):
         self._pending_actions = np.asarray(actions)
 
     def step_wait(self) -> VecEnvStepReturn:
+        # Gymnasium의 terminated/truncated 쌍을 SB3가 쓰는 done/info 형태로 변환하고 필요한 env만 reset한다.
         if hasattr(self.vector_env, "step_wait"):
             observations, rewards, terminations, truncations, vector_infos = self.vector_env.step_wait()
         else:

@@ -22,6 +22,8 @@ class AppSettings:
 
 
 def load_settings() -> AppSettings:
+    # 환경변수와 .env를 합쳐 서버가 사용할 모델, scene, frontend dist 경로를 확정한다.
+    # LINK: backend/app/main.py:22
     project_root = Path(os.environ.get("PINGPONG_PROJECT_ROOT", Path(__file__).resolve().parents[2])).resolve()
     env_values = read_env(project_root / ".env")
 
@@ -85,6 +87,7 @@ def resolve_existing_file(
     label: str,
     include_stable_baselines_zip_candidate: bool = False,
 ) -> Path:
+    # 배포 시작 전에 policy zip과 MuJoCo scene이 실제로 존재하는지 확인해 실패 지점을 명확히 한다.
     path = resolve_path(raw_path, project_root)
     candidates = [path]
 

@@ -29,6 +29,8 @@ CATALOG_EXCLUDED_RUN_NAMES = {
     "pmk_cf_self_rally_v29_first_contact_chase_sector",
 }
 CATALOG_EXCLUDED_ACTION_DIMS = {19}
+# 카탈로그는 dimension별 대표/최신 모델만 UI에 보이게 추려 live demo 선택지를 단순화한다.
+# LINK: backend/app/live_simulation.py:145
 CATALOG_REPRESENTATIVE_RUN_NAMES_BY_ACTION_DIM = {
     5: "ppo_keepup_v9",
 }
@@ -79,6 +81,8 @@ def build_model_catalog(
     active_model_path: Path,
     resolve_env_kwargs: EnvResolver,
 ) -> dict[str, ModelRecord]:
+    # artifact 폴더의 대표 zip들과 현재 active model을 합쳐 모델 metadata catalog를 만든다.
+    # LINK: backend/app/live_simulation.py:91
     paths = representative_model_paths(project_root / "rl" / "artifacts")
     paths[active_model_path.resolve()] = active_model_path.resolve()
 
@@ -97,6 +101,7 @@ def build_model_catalog(
 
 
 def representative_model_paths(artifacts_root: Path) -> dict[Path, Path]:
+    # 각 run directory마다 checkpoints를 제외하고 배포용 model zip 하나만 고른다.
     if not artifacts_root.is_dir():
         return {}
 
@@ -128,6 +133,8 @@ def build_model_record(
     resolve_env_kwargs: EnvResolver,
     used_ids: set[str],
 ) -> ModelRecord:
+    # SB3 zip과 training summary에서 UI/런타임 검증에 필요한 모델 설명을 뽑아낸다.
+    # LINK: backend/app/ball_spawn.py:47
     raw_run_name = infer_run_name(model_path)
     zip_metadata = read_sb3_zip_metadata(model_path)
     summary_path = training_summary_path(model_path, raw_run_name)
@@ -188,6 +195,7 @@ def build_model_record(
 
 
 def assign_dimension_versions(records: dict[str, ModelRecord]) -> dict[str, ModelRecord]:
+    # action dimension별로 V1, V2 같은 version label을 붙이고 catalogVisible 여부를 결정한다.
     grouped: dict[str, list[ModelRecord]] = {}
     for record in records.values():
         group = str(record.metadata.get("dimensionGroup") or dimension_group_label(record.metadata.get("actionDim")))
@@ -260,6 +268,7 @@ def assign_dimension_versions(records: dict[str, ModelRecord]) -> dict[str, Mode
 
 
 def with_loaded_policy_metadata(metadata: dict[str, Any], policy: Any) -> dict[str, Any]:
+    # 실제 load된 PPO 객체를 확인해 policy architecture 표시 정보를 보강한다.
     enriched = dict(metadata)
     policy_info = dict(enriched.get("policy") or {})
     architecture = loaded_policy_architecture(
@@ -275,6 +284,7 @@ def with_loaded_policy_metadata(metadata: dict[str, Any], policy: Any) -> dict[s
 
 
 def read_sb3_zip_metadata(model_path: Path) -> dict[str, Any]:
+    # Stable-Baselines3 zip 안의 data JSON은 observation/action space와 policy 설정을 담고 있다.
     try:
         with zipfile.ZipFile(model_path) as archive:
             return json.loads(archive.read("data").decode("utf-8"))
@@ -338,6 +348,8 @@ def summary_value(summary: dict[str, Any] | None, key: str) -> Any:
 
 
 def env_kwargs_with_summary_hints(env_kwargs: dict[str, Any], summary: dict[str, Any] | None) -> dict[str, Any]:
+    # 모델 훈련 때 저장된 env_config를 runtime kwargs에 덮어써 같은 action/observation 구성을 재현한다.
+    # LINK: backend/vendor/pingpong_rl2/src/pingpong_rl2/utils/ppo_runs.py:181
     if summary is None:
         return dict(env_kwargs)
 
@@ -373,6 +385,7 @@ def summary_env_hint_containers(summary: dict[str, Any]) -> list[Any]:
 
 
 def policy_metadata(zip_metadata: dict[str, Any], observation_dim: int | None, action_dim: int | None) -> dict[str, Any]:
+    # zip metadata만으로도 프론트 policy 설명 카드에 넣을 대략적인 신경망 구조를 만든다.
     policy_class = zip_metadata.get("policy_class")
     policy_kwargs = zip_metadata.get("policy_kwargs")
     class_name = None
@@ -479,6 +492,8 @@ def summary_action_labels(summary: dict[str, Any] | None) -> list[str] | None:
 
 
 def labels_for_action_mode(action_mode: str) -> list[str]:
+    # action mode 이름을 사람이 읽을 수 있는 control label 목록으로 변환한다.
+    # LINK: backend/vendor/pingpong_rl2/src/pingpong_rl2/envs/keepup_env.py:29
     if action_mode == "position":
         return ["Target X", "Target Y", "Target Z"]
     if action_mode == "position_tilt":
@@ -532,6 +547,7 @@ def tested_ranges(ball_spawn: BallSpawnConfig) -> dict[str, dict[str, float]]:
 
 
 def training_metadata(summary: dict[str, Any] | None) -> dict[str, Any]:
+    # training summary에서 run name, timestep, preset, seed만 UI용으로 얕게 추린다.
     if summary is None:
         return {}
     config = summary.get("config")

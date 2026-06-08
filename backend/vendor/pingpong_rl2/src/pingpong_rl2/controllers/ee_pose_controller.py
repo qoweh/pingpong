@@ -32,6 +32,8 @@ class RacketCartesianController:
         body_clearance_max_step: float = 0.0,
         body_clearance_body_names: Sequence[str] = ("link5",),
     ) -> None:
+        # policy가 정한 racket 목표 pose를 Franka 7축 관절 target으로 바꾸기 위한 Jacobian controller다.
+        # LINK: backend/vendor/pingpong_rl2/src/pingpong_rl2/envs/keepup_env.py:1376
         self._sim = sim
         self._damping = float(damping)
         self._position_gain = float(position_gain)
@@ -158,6 +160,7 @@ class RacketCartesianController:
         return self._anchor_position + target_offset
 
     def set_target_position(self, position: Sequence[float]) -> np.ndarray:
+        # 환경이 계산한 목표 위치를 workspace offset 제한 안으로 클램프한다.
         position_array = np.asarray(position, dtype=float)
         if position_array.shape != (3,):
             raise ValueError(f"Target position must have shape (3,), got {position_array.shape}.")
@@ -179,6 +182,7 @@ class RacketCartesianController:
         return self.target_tilt
 
     def set_target_velocity(self, velocity: Sequence[float] | None) -> np.ndarray:
+        # contact-frame 계열은 위치 목표에 더해 순간 목표 속도도 controller에 전달할 수 있다.
         if velocity is None:
             self._target_velocity = np.zeros(3, dtype=float)
             self._target_velocity_enabled = False
@@ -239,6 +243,7 @@ class RacketCartesianController:
         return vector
 
     def _posture_nullspace_delta(self, nullspace_projector: np.ndarray) -> np.ndarray:
+        # end-effector 작업을 해치지 않는 nullspace에서 기본 자세로 부드럽게 돌아가게 한다.
         if self._nullspace_posture_gain <= 0.0 or self._nullspace_posture_max_step <= 0.0:
             return np.zeros(7, dtype=float)
         current_joint_positions = self._sim.data.qpos[self._joint_qpos_indices]
@@ -247,6 +252,7 @@ class RacketCartesianController:
         return nullspace_projector @ posture_step
 
     def _body_clearance_nullspace_delta(self, nullspace_projector: np.ndarray) -> np.ndarray:
+        # 공 근처에서 지정 body가 너무 가까우면 nullspace 방향으로 살짝 밀어 충돌 가능성을 낮춘다.
         if (
             not self._clearance_reference_active
             or self._body_clearance_gain <= 0.0
@@ -310,6 +316,7 @@ class RacketCartesianController:
         return self._clip_vector_norm(clearance_delta, self._body_clearance_max_step)
 
     def compute_joint_targets(self) -> np.ndarray:
+        # 위치/자세/속도 error를 Jacobian damped least-squares로 풀어 다음 관절 target을 계산한다.
         current_position = self._sim.racket_position
         position_error = self._target_position - current_position
         error_norm = np.linalg.norm(position_error)

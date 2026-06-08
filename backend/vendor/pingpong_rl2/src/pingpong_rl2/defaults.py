@@ -64,6 +64,8 @@ LEGACY_PPO_RUN_NAMES = (
 
 
 def default_ppo_model_candidates(ppo_runs_root: Path) -> list[Path]:
+    # 명시 모델이 없을 때 action mode별 기본/스모크 run 이름 순서로 model zip 후보를 만든다.
+    # LINK: backend/vendor/pingpong_rl2/src/pingpong_rl2/utils/ppo_runs.py:140
     candidate_names = (
         DEFAULT_PPO_RUN_NAME,
         DEFAULT_PPO_POSITION_STRIKE_RUN_NAME,

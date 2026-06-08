@@ -14,6 +14,7 @@ SCENE_XML_PATH = ASSET_ROOT / "scene.xml"
 
 
 def resolve_input_path(path: Path) -> Path:
+    # 입력 파일은 절대경로, 현재 작업 디렉터리, 패키지 루트 순서로 해석한다.
     if path.is_absolute():
         return path.resolve()
 
@@ -25,6 +26,7 @@ def resolve_input_path(path: Path) -> Path:
 
 
 def resolve_output_path(path: Path) -> Path:
+    # 출력 파일은 패키지 루트를 기준으로 만들어 학습 artifact 위치를 일정하게 유지한다.
     if path.is_absolute():
         return path.resolve()
     return (PACKAGE_ROOT / path).resolve()

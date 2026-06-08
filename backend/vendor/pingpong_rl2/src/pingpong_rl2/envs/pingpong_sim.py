@@ -12,6 +12,8 @@ from pingpong_rl2.utils.paths import SCENE_XML_PATH, resolve_input_path
 
 class PingPongSim:
     def __init__(self, scene_path: Path | str | None = None, control_dt: float = DEFAULT_CONTROL_DT) -> None:
+        # MuJoCo XML scene을 열고 공/라켓/관절 id를 캐시해 이후 step 접근을 빠르게 만든다.
+        # LINK: backend/vendor/pingpong_rl2/src/pingpong_rl2/envs/keepup_env.py:176
         scene_file = resolve_input_path(Path(scene_path)) if scene_path is not None else SCENE_XML_PATH
         self.scene_path = scene_file.resolve()
         self.model = mujoco.MjModel.from_xml_path(str(self.scene_path))
@@ -116,6 +118,7 @@ class PingPongSim:
         ball_height: float | None = None,
         ball_xy_offset: Sequence[float] = (0.0, 0.0),
     ) -> mujoco.MjData:
+        # keyframe home pose로 되돌린 뒤 공을 racket 기준 위치나 명시 위치에 다시 놓는다.
         mujoco.mj_resetDataKeyframe(self.model, self.data, 0)
         self.data.ctrl[:] = self._home_ctrl
         mujoco.mj_forward(self.model, self.data)
@@ -139,6 +142,8 @@ class PingPongSim:
         velocity: Sequence[float] = (0.0, 0.0, 0.0),
         angular_velocity: Sequence[float] | None = None,
     ) -> np.ndarray:
+        # free joint qpos/qvel에 공 위치, 자세, 선속도, 각속도를 직접 써서 공을 재배치한다.
+        # LINK: backend/app/live_simulation.py:482
         position_array = np.asarray(position, dtype=float)
         velocity_array = np.asarray(velocity, dtype=float)
         angular_velocity_array = (
@@ -319,6 +324,7 @@ class PingPongSim:
         z_bounds: tuple[float, float] = (-0.05, 2.0),
         max_ball_speed: float = 8.0,
     ) -> str | None:
+        # 물리 state, 바닥/로봇 접촉, 영역 이탈, 과속을 episode 실패 사유로 판정한다.
         if not self.state_is_finite():
             return "nonfinite_state"
         if self.has_contact("ball_geom", "floor"):
@@ -342,6 +348,7 @@ class PingPongSim:
         gripper_target: float | None = None,
         n_substeps: int | None = None,
     ) -> mujoco.MjData:
+        # 제어 주기(control_dt)를 MuJoCo timestep 여러 번으로 나누어 실제 물리를 진행한다.
         if joint_targets is not None:
             self.set_arm_joint_targets(joint_targets, gripper_target)
 
@@ -357,6 +364,8 @@ class PingPongSim:
         n_substeps: int | None = None,
         contact_geoms: tuple[str, str] = ("ball_geom", "racket_head"),
     ) -> dict[str, object]:
+        # substep 동안 공-라켓 접촉이 발생한 순간의 위치/속도/법선을 reward 계산용 trace로 남긴다.
+        # LINK: backend/vendor/pingpong_rl2/src/pingpong_rl2/envs/keepup_env.py:1625
         if joint_targets is not None:
             self.set_arm_joint_targets(joint_targets, gripper_target)
 

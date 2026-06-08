@@ -47,6 +47,8 @@ _STRIKE_CONTRACT_ACTION_MODES = (
 
 @dataclass(slots=True)
 class HeuristicKeepUpPolicy:
+    # PPO가 아닌 규칙 기반 baseline으로, phase별로 strike/recovery 목표를 보정해 action을 만든다.
+    # LINK: backend/vendor/pingpong_rl2/src/pingpong_rl2/envs/keepup_env.py:2704
     return_blend: float = 0.72
     recovery_blend: float = 0.52
     strike_z_boost: float = 0.018
@@ -73,6 +75,7 @@ class HeuristicKeepUpPolicy:
         return None
 
     def _position_residual_for_phase(self, phase_name: str) -> np.ndarray:
+        # prepare/strike/recovery phase에 따라 고정 또는 phase-specific 위치 residual을 선택한다.
         if phase_name in {"prepare", "strike"}:
             position_residual = self.strike_position_residual
         elif phase_name in {"return_shaping", "recovery"}:
@@ -146,6 +149,8 @@ class HeuristicKeepUpPolicy:
         return float(followup_lift_residual)
 
     def predict(self, env: PingPongKeepUpEnv) -> np.ndarray:
+        # 현재 환경 phase와 intercept 예측을 보고 strike-contract action vector를 구성한다.
+        # LINK: backend/vendor/pingpong_rl2/src/pingpong_rl2/envs/keepup_env.py:1625
         if env.action_mode not in _STRIKE_CONTRACT_ACTION_MODES:
             raise ValueError(
                 "HeuristicKeepUpPolicy requires a strike-contract action mode so it can steer the strike controller."
