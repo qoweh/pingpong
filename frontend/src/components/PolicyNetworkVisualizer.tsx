@@ -116,7 +116,7 @@ function PolicyNetworkSvg({
       <NetworkGrid nodes={hidden2Nodes} label="hidden 2" count={secondHidden.total} />
       <NetworkColumn nodes={outputNodes} label="policy output" align="right" />
       <text x="330" y="346" textAnchor="middle" className="network-caption">
-        red + / blue - / action color boosted near zero
+        red(positive) · blue(negative) · pale(near zero)
       </text>
     </svg>
   );
@@ -291,18 +291,25 @@ function actionDisplaySignal(model: ModelMetadata | null, value: number, index: 
   if (Math.abs(signal) < 0.001) {
     return 0;
   }
-  return Math.sign(signal) * Math.min(1, Math.max(0.24, Math.abs(signal) * 2.8));
+  return Math.sign(signal) * Math.min(1, Math.max(0.18, Math.abs(signal) * 2.6));
 }
 
 function nodeColor(value: number): string {
   const signal = clampSignal(value);
-  if (signal > 0.16) {
-    return "#e3483f";
+  const magnitude = Math.min(1, Math.abs(signal));
+  if (signal > 0) {
+    return blendColor([227, 232, 239], [227, 72, 63], magnitude);
   }
-  if (signal < -0.16) {
-    return "#3f59d9";
+  if (signal < 0) {
+    return blendColor([227, 232, 239], [63, 89, 217], magnitude);
   }
-  return "#e3e8ef";
+  return "rgb(227, 232, 239)";
+}
+
+function blendColor(from: [number, number, number], to: [number, number, number], amount: number): string {
+  const clamped = Math.max(0, Math.min(1, amount));
+  const [r, g, b] = from.map((start, index) => Math.round(start + (to[index] - start) * clamped));
+  return `rgb(${r}, ${g}, ${b})`;
 }
 
 function clampSignal(value: number): number {
