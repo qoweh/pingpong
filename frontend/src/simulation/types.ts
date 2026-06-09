@@ -57,6 +57,13 @@ export interface PolicyMetadata {
   architecture?: string[];
 }
 
+export interface PolicyTrace {
+  observation: number[];
+  hiddenLayers: number[][];
+  actionMean?: number[] | null;
+  action: number[];
+}
+
 export interface ModelMetadata {
   id: string;
   name: string;
@@ -124,6 +131,7 @@ export interface SimulationSnapshot {
   policyMessage: string;
   modelId: string | null;
   action: number[] | null;
+  policyTrace: PolicyTrace | null;
 }
 
 export interface LoadingProgress {
@@ -194,5 +202,6 @@ export const ZERO_SNAPSHOT: SimulationSnapshot = {
   policyLoaded: false,
   policyMessage: "Connecting to policy model",
   modelId: null,
-  action: null
+  action: null,
+  policyTrace: null
 };

@@ -330,6 +330,7 @@ button {
   left: 20px;
   z-index: 7;
   width: 340px;
+  overflow: visible;
 }
 
 .control-shell.closed {
@@ -744,6 +745,128 @@ select {
   background: linear-gradient(90deg, var(--accent), var(--accent-2));
 }
 
+.policy-network-wrap {
+  position: absolute;
+  right: -160px;
+  bottom: 0;
+  display: grid;
+  justify-items: end;
+  gap: 8px;
+  min-height: 36px;
+  margin-top: auto;
+  padding-top: 2px;
+  z-index: 9;
+  pointer-events: none;
+}
+
+.policy-network-wrap.open {
+  justify-items: stretch;
+  right: -532px;
+  width: 520px;
+}
+
+.policy-network-toggle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  justify-self: end;
+  width: fit-content;
+  min-width: 126px;
+  max-width: 142px;
+  min-height: 34px;
+  padding: 0 10px;
+  border: 1px solid rgba(50, 213, 164, 0.32);
+  border-radius: 7px;
+  background: rgba(32, 32, 32, 0.92);
+  color: #eafaf6;
+  font-size: 0.78rem;
+  font-weight: 680;
+  cursor: pointer;
+  pointer-events: auto;
+}
+
+.policy-network-toggle:hover,
+.policy-network-toggle:focus-visible,
+.policy-network-toggle[aria-pressed="true"] {
+  border-color: rgba(50, 213, 164, 0.72);
+  background: rgba(50, 213, 164, 0.14);
+  outline: none;
+}
+
+.policy-network-card {
+  display: grid;
+  gap: 6px;
+  width: 100%;
+  min-height: 352px;
+  padding: 15px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 7px;
+  background: rgba(20, 33, 48, 0.92);
+  box-shadow: inset 0 0 0 1px rgba(50, 213, 164, 0.05);
+  pointer-events: auto;
+}
+
+.policy-network-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  min-width: 0;
+}
+
+.policy-network-heading span {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  color: #f2f7fb;
+  font-size: 1rem;
+  font-weight: 760;
+}
+
+.policy-network-heading strong {
+  min-width: 0;
+  overflow: hidden;
+  color: #b8c7d6;
+  font: 0.78rem/1.1 ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
+  text-align: right;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.policy-network-svg {
+  display: block;
+  width: 100%;
+  aspect-ratio: 320 / 190;
+  min-height: 296px;
+}
+
+.network-node {
+  stroke: #111923;
+  stroke-width: 2;
+}
+
+.network-column-label {
+  fill: #b8c7d6;
+  font-size: 10.5px;
+  font-weight: 720;
+  letter-spacing: 0;
+}
+
+.network-node-label {
+  fill: #eef4fb;
+  font-size: 9.4px;
+  paint-order: stroke;
+  stroke: #142130;
+  stroke-width: 3px;
+}
+
+.network-caption {
+  fill: #aab9c9;
+  font-size: 10px;
+}
+
 .policy-architecture {
   display: flex;
   flex-wrap: wrap;
@@ -1080,6 +1203,20 @@ select {
   .control-pane,
   .model-pane {
     grid-template-columns: 1fr;
+  }
+
+  .policy-network-wrap,
+  .policy-network-wrap.open {
+    position: static;
+    width: auto;
+    max-width: none;
+    margin: 0;
+    padding: 0 14px 14px;
+    justify-items: end;
+  }
+
+  .policy-network-card {
+    min-height: 300px;
   }
 
   .docs-sidebar nav {

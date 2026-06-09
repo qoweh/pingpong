@@ -2,6 +2,7 @@ import { ExternalLink, PanelLeftClose, PanelLeftOpen, PanelRightClose, PanelRigh
 import { lazy, Suspense, useCallback, useEffect, useMemo, useState } from "react";
 
 import { ActionVisualizer } from "../components/ActionVisualizer";
+import { PolicyNetworkVisualizer } from "../components/PolicyNetworkVisualizer";
 import { BallControls } from "../controls/BallControls";
 import { CameraControls } from "../controls/CameraControls";
 import { ModelControls } from "../controls/ModelControls";
@@ -51,6 +52,7 @@ export function App() {
   const [cameraResetSignal, setCameraResetSignal] = useState(0);
   const [modelPanelOpen, setModelPanelOpen] = useState(true);
   const [controlsOpen, setControlsOpen] = useState(true);
+  const [policyNetworkOpen, setPolicyNetworkOpen] = useState(false);
   const selectedModel = useMemo(
     () => models.find((model) => model.id === activeModelId) ?? models[0] ?? null,
     [activeModelId, models]
@@ -290,6 +292,14 @@ export function App() {
                     />
                     <ActionVisualizer action={snapshot.action} model={selectedModel} />
                   </aside>
+                ) : null}
+                {modelPanelOpen ? (
+                  <PolicyNetworkVisualizer
+                    model={selectedModel}
+                    trace={snapshot.policyTrace}
+                    visible={policyNetworkOpen}
+                    onToggle={() => setPolicyNetworkOpen((open) => !open)}
+                  />
                 ) : null}
               </div>
 

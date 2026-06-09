@@ -8,6 +8,7 @@ import type {
   ContactEvent,
   LoadingProgress,
   PlaybackState,
+  PolicyTrace,
   SimulationSnapshot,
   Vec3
 } from "./types";
@@ -57,6 +58,7 @@ type LiveFrame = {
     last: ContactEvent | null;
   };
   action: number[] | null;
+  policyTrace?: PolicyTrace | null;
 };
 
 type LiveMessage =
@@ -110,6 +112,7 @@ export class MujocoWorld {
   private policyMessage = "Connecting to policy model";
   private liveModelId: string | null = null;
   private latestAction: number[] | null = null;
+  private latestPolicyTrace: PolicyTrace | null = null;
 
   async initialize(onProgress?: LoadingProgressListener): Promise<void> {
     this.disposed = false;
@@ -184,6 +187,7 @@ export class MujocoWorld {
     this.terminated = false;
     this.truncated = false;
     this.latestAction = null;
+    this.latestPolicyTrace = null;
     this.resetSerial += 1;
     this.pendingSpawn = { ...settings };
     this.flushPendingSpawn();
@@ -387,6 +391,7 @@ export class MujocoWorld {
     this.currentEpisode = frame.episode;
     this.liveModelId = frame.modelId ?? this.liveModelId;
     this.latestAction = Array.isArray(frame.action) ? frame.action : this.latestAction;
+    this.latestPolicyTrace = isPolicyTrace(frame.policyTrace) ? frame.policyTrace : this.latestPolicyTrace;
     this.contactCount = frame.contact.count;
     this.contactEvent = frame.contact.event;
     this.lastContact = frame.contact.last;
@@ -408,6 +413,7 @@ export class MujocoWorld {
       this.terminated = false;
       this.truncated = false;
       this.latestAction = null;
+      this.latestPolicyTrace = null;
       this.resetSerial += 1;
       return;
     }
@@ -422,6 +428,7 @@ export class MujocoWorld {
     this.terminated = false;
     this.truncated = false;
     this.latestAction = null;
+    this.latestPolicyTrace = null;
     this.resetSerial += 1;
   }
 
@@ -575,7 +582,8 @@ export class MujocoWorld {
       policyLoaded: this.liveConnected && this.liveReady,
       policyMessage: this.policyMessage,
       modelId: this.liveModelId,
-      action: this.latestAction
+      action: this.latestAction,
+      policyTrace: this.latestPolicyTrace
     };
   }
 
@@ -623,7 +631,8 @@ export class MujocoWorld {
       policyLoaded: false,
       policyMessage: this.policyMessage,
       modelId: this.liveModelId,
-      action: this.latestAction
+      action: this.latestAction,
+      policyTrace: this.latestPolicyTrace
     };
   }
 }
@@ -644,6 +653,19 @@ function parseLiveMessage(rawData: unknown): LiveMessage | null {
   } catch {
     return null;
   }
+}
+
+function isPolicyTrace(value: unknown): value is PolicyTrace {
+  if (!value || typeof value !== "object") {
+    return false;
+  }
+  const trace = value as PolicyTrace;
+  return (
+    Array.isArray(trace.observation) &&
+    Array.isArray(trace.hiddenLayers) &&
+    Array.isArray(trace.action) &&
+    trace.hiddenLayers.every((layer) => Array.isArray(layer))
+  );
 }
 
 function normalizeModelPath(filePath: string): string {

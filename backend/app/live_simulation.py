@@ -13,6 +13,7 @@ from pathlib import Path
 from typing import Any
 
 import numpy as np
+import torch as th
 from stable_baselines3 import PPO
 
 from .ball_spawn import build_ball_spawn_config, parse_ball_spawn_options
@@ -75,6 +76,45 @@ class RuntimeModel:
                 deterministic=deterministic,
             )
         return np.asarray(action, dtype=float)
+
+    def predict_with_trace(self, observation: Any, deterministic: bool) -> tuple[np.ndarray, dict[str, Any]]:
+        # live UI가 policy network를 그릴 수 있도록 실제 policy 입력과 actor hidden activation을 함께 계산한다.
+        policy_observation = self.policy_observation(observation)
+        with self.policy_lock:
+            action, _ = self.policy.predict(policy_observation, deterministic=deterministic)
+            trace = self.policy_trace(policy_observation, action)
+        return np.asarray(action, dtype=float), trace
+
+    def policy_trace(self, policy_observation: np.ndarray, action: Any) -> dict[str, Any]:
+        # Stable-Baselines3 MlpPolicy의 actor branch를 따라가며 layer activation을 JSON-friendly 값으로 만든다.
+        policy = self.policy.policy
+        actor_net = getattr(getattr(policy, "mlp_extractor", None), "policy_net", None)
+        action_net = getattr(policy, "action_net", None)
+        hidden_layers: list[list[float]] = []
+        action_mean: list[float] | None = None
+        if actor_net is not None:
+            tensor = th.as_tensor(policy_observation.reshape(1, -1), dtype=th.float32, device=self.policy.device)
+            with th.no_grad():
+                value = tensor
+                pending_linear_output: th.Tensor | None = None
+                for layer in actor_net:
+                    value = layer(value)
+                    if isinstance(layer, th.nn.Linear):
+                        pending_linear_output = value
+                    elif pending_linear_output is not None:
+                        hidden_layers.append(numeric_list(value.detach().cpu().numpy()))
+                        pending_linear_output = None
+                if pending_linear_output is not None:
+                    hidden_layers.append(numeric_list(pending_linear_output.detach().cpu().numpy()))
+                if action_net is not None:
+                    action_mean = numeric_list(action_net(value).detach().cpu().numpy())
+
+        return {
+            "observation": numeric_list(policy_observation),
+            "hiddenLayers": hidden_layers,
+            "actionMean": action_mean,
+            "action": numeric_list(action),
+        }
 
     def policy_observation(self, observation: Any) -> np.ndarray:
         # 오래된 모델의 observation 차원이 다를 때는 현재 observation에서 호환 가능한 부분만 투영한다.
@@ -445,6 +485,7 @@ class LiveSimulationSession:
         self.last_info: dict[str, Any] = {}
         self.last_reward: float | None = None
         self.last_contact: dict[str, Any] | None = None
+        self.last_policy_trace: dict[str, Any] | None = None
         self.custom_reset_options: dict[str, Any] | None = None
         self.observation, self.last_info = self.env.reset(seed=service.settings.seed)
         self.runtime.control_dt = self.control_dt
@@ -472,6 +513,7 @@ class LiveSimulationSession:
         self.reset_pending = False
         self.last_reward = None
         self.last_contact = None
+        self.last_policy_trace = None
         self.observation, self.last_info = self.env.reset(
             seed=self.service.settings.seed + self.episode_index,
             options=self.custom_reset_options,
@@ -501,6 +543,7 @@ class LiveSimulationSession:
         self.reset_pending = False
         self.last_reward = None
         self.last_contact = None
+        self.last_policy_trace = None
         self.observation = base_env.observation().astype(np.float32, copy=False)
         self._validate_observation_shape()
         self.last_info = self._spawn_info(ball_xy_offset)
@@ -512,10 +555,14 @@ class LiveSimulationSession:
         if self.reset_pending:
             return self.reset()
 
-        action = self.runtime.predict(self.observation, deterministic=self.service.settings.deterministic_policy)
+        action, policy_trace = self.runtime.predict_with_trace(
+            self.observation,
+            deterministic=self.service.settings.deterministic_policy,
+        )
         self.observation, reward, terminated, truncated, info = self.env.step(action)
         self.last_reward = float(reward)
         self.last_info = dict(info)
+        self.last_policy_trace = policy_trace
         self.step_index += 1
         frame = self.frame(
             action=action,
@@ -649,6 +696,7 @@ class LiveSimulationSession:
                 "last": self.last_contact,
             },
             "action": numeric_list(action) if action is not None else None,
+            "policyTrace": self.last_policy_trace,
         }
 
 
