@@ -6,6 +6,10 @@ interface PolicyNetworkVisualizerProps {
   model: ModelMetadata | null;
   trace: PolicyTrace | null;
   visible: boolean;
+}
+
+interface PolicyNetworkToggleProps {
+  visible: boolean;
   onToggle: () => void;
 }
 
@@ -15,6 +19,7 @@ type NodePoint = {
   y: number;
   value: number;
   label?: string;
+  radius?: number;
 };
 
 const V39_INPUT_LABELS: Record<number, string> = {
@@ -33,14 +38,30 @@ const V39_INPUT_LABELS: Record<number, string> = {
 };
 const V39_INPUT_INDICES = [15, 16, 23, 24, 25, 28, 41, 42, 43, 47, 48, 49];
 
-export function PolicyNetworkVisualizer({ model, trace, visible, onToggle }: PolicyNetworkVisualizerProps) {
+export function PolicyNetworkToggle({ visible, onToggle }: PolicyNetworkToggleProps) {
+  return (
+    <button
+      className="policy-network-toggle"
+      type="button"
+      title={visible ? "Hide policy network" : "Show policy network"}
+      aria-label={visible ? "Hide policy network" : "Show policy network"}
+      aria-pressed={visible}
+      onClick={onToggle}
+    >
+      {visible ? <EyeOff size={15} /> : <Eye size={15} />}
+      <span>Policy Network</span>
+    </button>
+  );
+}
+
+export function PolicyNetworkPanel({ model, trace, visible }: PolicyNetworkVisualizerProps) {
   const observationDim = model?.observationDim ?? trace?.observation.length ?? 0;
   const actionDim = model?.actionDim ?? trace?.action.length ?? 0;
   const hiddenDims = hiddenLayerDims(model, trace);
   const architectureText = [observationDim || "?", ...hiddenDims, actionDim || "?"].join(" -> ");
 
   return (
-    <div className={visible ? "policy-network-wrap open" : "policy-network-wrap"}>
+    <div className={visible ? "policy-network-panel-wrap open" : "policy-network-panel-wrap"} aria-hidden={!visible}>
       {visible ? (
         <div className="policy-network-card" aria-label="Policy decision flow visualization">
           <div className="policy-network-heading">
@@ -53,17 +74,6 @@ export function PolicyNetworkVisualizer({ model, trace, visible, onToggle }: Pol
           <PolicyNetworkSvg model={model} trace={trace} observationDim={observationDim} actionDim={actionDim} hiddenDims={hiddenDims} />
         </div>
       ) : null}
-      <button
-        className="policy-network-toggle"
-        type="button"
-        title={visible ? "Hide policy decision flow" : "Show policy decision flow"}
-        aria-label={visible ? "Hide policy decision flow" : "Show policy decision flow"}
-        aria-pressed={visible}
-        onClick={onToggle}
-      >
-        {visible ? <EyeOff size={15} /> : <Eye size={15} />}
-        <span>Decision Flow</span>
-      </button>
     </div>
   );
 }
@@ -83,30 +93,30 @@ function PolicyNetworkSvg({
 }) {
   const inputIndices = selectedInputIndices(observationDim);
   const inputs = inputIndices.map((index) => trace?.observation[index] ?? 0);
-  const firstHidden = selectedValues(trace?.hiddenLayers[0], hiddenDims[0] ?? 0, 9);
-  const secondHidden = selectedValues(trace?.hiddenLayers[1], hiddenDims[1] ?? 0, 9);
+  const firstHidden = layerValues(trace?.hiddenLayers[0], hiddenDims[0] ?? 0);
+  const secondHidden = layerValues(trace?.hiddenLayers[1], hiddenDims[1] ?? 0);
   const actions = Array.from({ length: Math.max(actionDim, trace?.action.length ?? 0) }, (_, index) => trace?.action[index] ?? 0);
   const outputIndices = selectedOutputIndices(actions.length);
-  const outputValues = outputIndices.map((index) => normalizedAction(model, actions[index] ?? 0, index));
+  const outputValues = outputIndices.map((index) => actionDisplaySignal(model, actions[index] ?? 0, index));
 
-  const inputNodes = makeNodes("in", 30, inputs, inputIndices.map((index) => inputLabel(index, observationDim)));
-  const hidden1Nodes = makeNodes("h1", 112, firstHidden.values, firstHidden.labels);
-  const hidden2Nodes = makeNodes("h2", 192, secondHidden.values, secondHidden.labels);
-  const outputNodes = makeNodes("out", 274, outputValues, outputIndices.map((index) => outputLabel(model, index)));
+  const inputNodes = makeVerticalNodes("in", 72, inputs, inputIndices.map((index) => inputLabel(index, observationDim)), 46, 312);
+  const hidden1Nodes = makeGridNodes("h1", 224, 58, 112, 214, firstHidden.values);
+  const hidden2Nodes = makeGridNodes("h2", 404, 58, 112, 214, secondHidden.values);
+  const outputNodes = makeVerticalNodes("out", 580, outputValues, outputIndices.map((index) => outputLabel(model, index)), 46, 312);
 
   return (
-    <svg className="policy-network-svg" viewBox="0 0 320 190" role="img" aria-label="Live policy network">
+    <svg className="policy-network-svg" viewBox="0 0 660 360" role="img" aria-label="Live policy network">
       <g className="network-edges">
-        {edgesBetween(inputNodes, hidden1Nodes, 3).map((edge) => drawEdge(edge.from, edge.to, edge.key))}
-        {edgesBetween(hidden1Nodes, hidden2Nodes, 3).map((edge) => drawEdge(edge.from, edge.to, edge.key))}
-        {edgesBetween(hidden2Nodes, outputNodes, 3).map((edge) => drawEdge(edge.from, edge.to, edge.key))}
+        {edgesBetween(inputNodes, hidden1Nodes, 4).map((edge) => drawEdge(edge.from, edge.to, edge.key))}
+        {edgesBetween(hidden1Nodes, hidden2Nodes, 2).map((edge) => drawEdge(edge.from, edge.to, edge.key))}
+        {edgesBetween(hidden2Nodes, outputNodes, 1).map((edge) => drawEdge(edge.from, edge.to, edge.key))}
       </g>
-      <NetworkColumn nodes={inputNodes} label="obs" align="left" />
-      <NetworkColumn nodes={hidden1Nodes} label={`${hiddenDims[0] ?? 0}`} />
-      <NetworkColumn nodes={hidden2Nodes} label={`${hiddenDims[1] ?? hiddenDims[0] ?? 0}`} />
-      <NetworkColumn nodes={outputNodes} label="action" align="right" />
-      <text x="160" y="184" textAnchor="middle" className="network-caption">
-        red positive · blue negative · white near zero
+      <NetworkColumn nodes={inputNodes} label="observation" align="left" />
+      <NetworkGrid nodes={hidden1Nodes} label="hidden 1" count={firstHidden.total} />
+      <NetworkGrid nodes={hidden2Nodes} label="hidden 2" count={secondHidden.total} />
+      <NetworkColumn nodes={outputNodes} label="policy output" align="right" />
+      <text x="330" y="346" textAnchor="middle" className="network-caption">
+        red + / blue - / action color boosted near zero
       </text>
     </svg>
   );
@@ -120,10 +130,10 @@ function NetworkColumn({ nodes, label, align = "center" }: { nodes: NodePoint[];
       </text>
       {nodes.map((node) => (
         <g key={node.id}>
-          <circle cx={node.x} cy={node.y} r="6.8" className="network-node" fill={nodeColor(node.value)} />
+          <circle cx={node.x} cy={node.y} r={node.radius ?? 6.8} className="network-node" fill={nodeColor(node.value)} />
           {node.label ? (
             <text
-              x={align === "left" ? node.x - 10 : node.x + 10}
+              x={align === "left" ? node.x - 12 : node.x + 12}
               y={node.y + 3}
               textAnchor={align === "left" ? "end" : "start"}
               className="network-node-label"
@@ -137,9 +147,26 @@ function NetworkColumn({ nodes, label, align = "center" }: { nodes: NodePoint[];
   );
 }
 
+function NetworkGrid({ nodes, label, count }: { nodes: NodePoint[]; label: string; count: number }) {
+  const centerX = nodes.reduce((sum, node) => sum + node.x, 0) / Math.max(1, nodes.length);
+  return (
+    <g>
+      <text x={centerX} y="22" textAnchor="middle" className="network-column-label">
+        {label}
+      </text>
+      <text x={centerX} y="38" textAnchor="middle" className="network-caption">
+        {count} units
+      </text>
+      {nodes.map((node) => (
+        <circle key={node.id} cx={node.x} cy={node.y} r={node.radius ?? 4.4} className="network-node" fill={nodeColor(node.value)} />
+      ))}
+    </g>
+  );
+}
+
 function drawEdge(from: NodePoint, to: NodePoint, key: string) {
   const mixed = (from.value + to.value) / 2;
-  const opacity = Math.min(0.48, 0.09 + Math.abs(mixed) * 0.36);
+  const opacity = Math.min(0.52, 0.08 + Math.abs(mixed) * 0.34);
   return (
     <line
       key={key}
@@ -149,20 +176,39 @@ function drawEdge(from: NodePoint, to: NodePoint, key: string) {
       y2={to.y}
       stroke={mixed >= 0 ? "#ff6b5f" : "#6f83ff"}
       strokeOpacity={opacity}
-      strokeWidth={0.7 + Math.abs(mixed) * 1.8}
+      strokeWidth={0.5 + Math.abs(mixed) * 1.3}
     />
   );
 }
 
-function makeNodes(prefix: string, x: number, values: number[], labels?: string[]): NodePoint[] {
+function makeVerticalNodes(prefix: string, x: number, values: number[], labels?: string[], top = 28, bottom = 166): NodePoint[] {
   const count = Math.max(1, values.length);
   return values.map((value, index) => ({
     id: `${prefix}-${index}`,
     x,
-    y: 28 + (index * 138) / Math.max(1, count - 1),
+    y: top + (index * (bottom - top)) / Math.max(1, count - 1),
     value: clampSignal(value),
-    label: labels?.[index]
+    label: labels?.[index],
+    radius: values.length > 12 ? 5.4 : 6.8
   }));
+}
+
+function makeGridNodes(prefix: string, centerX: number, top: number, width: number, height: number, values: number[]): NodePoint[] {
+  const count = Math.max(1, values.length);
+  const columns = Math.ceil(Math.sqrt(count));
+  const rows = Math.ceil(count / columns);
+  const radius = count <= 64 ? 4.4 : 3.6;
+  return values.map((value, index) => {
+    const column = index % columns;
+    const row = Math.floor(index / columns);
+    return {
+      id: `${prefix}-${index}`,
+      x: centerX - width / 2 + (column * width) / Math.max(1, columns - 1),
+      y: top + (row * height) / Math.max(1, rows - 1),
+      value: clampSignal(value),
+      radius
+    };
+  });
 }
 
 function edgesBetween(from: NodePoint[], to: NodePoint[], fanout: number) {
@@ -202,24 +248,25 @@ function selectedInputIndices(observationDim: number): number[] {
 }
 
 function selectedOutputIndices(actionDim: number): number[] {
-  if (actionDim <= 10) {
+  if (actionDim <= 20) {
     return Array.from({ length: Math.max(0, actionDim) }, (_, index) => index);
   }
-  return Array.from({ length: 10 }, (_, index) => Math.round((index * (actionDim - 1)) / 9));
+  return Array.from({ length: 20 }, (_, index) => Math.round((index * (actionDim - 1)) / 19));
 }
 
-function selectedValues(values: number[] | undefined, dim: number, count: number): { values: number[]; labels: string[] } {
+function layerValues(values: number[] | undefined, dim: number): { values: number[]; total: number } {
   const effectiveDim = Math.max(dim, values?.length ?? 0);
   if (!effectiveDim) {
-    return { values: [0], labels: [""] };
+    return { values: [0], total: 0 };
   }
+  const count = Math.min(effectiveDim, 96);
   const indices =
     effectiveDim <= count
       ? Array.from({ length: effectiveDim }, (_, index) => index)
       : Array.from({ length: count }, (_, index) => Math.round((index * (effectiveDim - 1)) / (count - 1)));
   return {
     values: indices.map((index) => values?.[index] ?? 0),
-    labels: indices.map((index) => (index === indices[Math.floor(indices.length / 2)] ? "..." : ""))
+    total: effectiveDim
   };
 }
 
@@ -237,6 +284,14 @@ function normalizedAction(model: ModelMetadata | null, value: number, index: num
   const low = Math.abs(model?.actionLow?.[index] ?? 0);
   const limit = Math.max(high, low, 1);
   return value / limit;
+}
+
+function actionDisplaySignal(model: ModelMetadata | null, value: number, index: number): number {
+  const signal = normalizedAction(model, value, index);
+  if (Math.abs(signal) < 0.001) {
+    return 0;
+  }
+  return Math.sign(signal) * Math.min(1, Math.max(0.24, Math.abs(signal) * 2.8));
 }
 
 function nodeColor(value: number): string {
