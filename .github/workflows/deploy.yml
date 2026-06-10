@@ -13,7 +13,7 @@ jobs:
       - name: Deploy
         shell: bash
         run: |
-          cd /home/pilt/pingpong
+          cd "${DEPLOY_DIR:-$HOME/pingpong}"
           git fetch origin
           git reset --hard origin/main
           docker compose build --quiet
